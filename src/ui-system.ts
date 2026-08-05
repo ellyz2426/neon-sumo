@@ -29,6 +29,7 @@ export class UISystem extends createSystem({}) {
 
   private wire() {
     this.menuPanel?.getElementById('btn-play')?.addEventListener('click', () => { this.sumo.startMatch(); this.showOnly('hud'); });
+    this.menuPanel?.getElementById('btn-tournament')?.addEventListener('click', () => { this.sumo.startTournament(); this.showOnly('hud'); });
     this.menuPanel?.getElementById('btn-settings')?.addEventListener('click', () => { this.sumo.setState('settings'); this.showOnly('settings'); });
     this.menuPanel?.getElementById('btn-stats')?.addEventListener('click', () => { this.sumo.setState('stats'); this.updateStats(); this.showOnly('stats'); });
 
@@ -37,7 +38,20 @@ export class UISystem extends createSystem({}) {
     this.pausePanel?.getElementById('btn-resume')?.addEventListener('click', () => { this.sumo.setState('playing'); this.showOnly('hud'); });
     this.pausePanel?.getElementById('btn-quit')?.addEventListener('click', () => { this.sumo.setState('menu'); this.showOnly('menu'); });
 
-    this.resultsPanel?.getElementById('btn-next')?.addEventListener('click', () => { this.sumo.startMatch(); this.showOnly('hud'); });
+    this.resultsPanel?.getElementById('btn-next')?.addEventListener('click', () => {
+      const d = this.sumo.getGameData();
+      if (d.inTournament && d.matchResult === 'win' && d.tournamentRound < d.tournamentBracket.length) {
+        this.sumo.startMatch();
+        this.showOnly('hud');
+      } else if (d.inTournament) {
+        // Tournament over (loss or champion)
+        this.sumo.setState('menu');
+        this.showOnly('menu');
+      } else {
+        this.sumo.startMatch();
+        this.showOnly('hud');
+      }
+    });
     this.resultsPanel?.getElementById('btn-menu')?.addEventListener('click', () => { this.sumo.setState('menu'); this.showOnly('menu'); });
 
     this.settingsPanel?.getElementById('btn-easy')?.addEventListener('click', () => { this.sumo.setDifficulty(0); this.updateSettings(); });
@@ -90,11 +104,16 @@ export class UISystem extends createSystem({}) {
   private updateHUD(d: ReturnType<SumoSystem['getGameData']>) {
     const h = this.hudPanel;
     if (!h) return;
-    if (d.isCountdown) {
+    if (d.tachiai) {
+      h.getElementById('countdown')?.setProperties({ text: '' });
+      h.getElementById('tachiai-text')?.setProperties({ text: '⚡ TACHIAI ⚡' });
+    } else if (d.isCountdown) {
       const ct = Math.ceil(d.countdownTime);
       h.getElementById('countdown')?.setProperties({ text: ct > 0 ? String(ct) : 'FIGHT!' });
+      h.getElementById('tachiai-text')?.setProperties({ text: '' });
     } else {
       h.getElementById('countdown')?.setProperties({ text: '' });
+      h.getElementById('tachiai-text')?.setProperties({ text: '' });
     }
     h.getElementById('score')?.setProperties({ text: `Score: ${d.score}` });
     h.getElementById('time')?.setProperties({ text: `Time: ${Math.ceil(d.roundTime)}s` });
@@ -102,11 +121,17 @@ export class UISystem extends createSystem({}) {
     h.getElementById('opponent-name')?.setProperties({ text: `VS ${this.sumo.getOpponentName()}` });
     h.getElementById('match-num')?.setProperties({ text: `Match ${d.matchNumber}` });
     h.getElementById('streak')?.setProperties({ text: d.currentStreak > 1 ? `${d.currentStreak} Win Streak!` : '' });
+    // Stamina
+    const stPct = Math.round(d.playerStamina);
+    h.getElementById('stamina-label')?.setProperties({ text: `Stamina: ${stPct}%` });
+    h.getElementById('stamina-bar')?.setProperties({ width: `${Math.round(d.playerStamina * 2.8)}` });
+    // Tournament info
+    h.getElementById('tourney-info')?.setProperties({ text: this.sumo.getTournamentInfo() });
     // Cooldown indicators
-    h.getElementById('push-cd')?.setProperties({ text: d.playerPushCD > 0 ? `Push: ${d.playerPushCD.toFixed(1)}s` : 'Push: READY' });
-    h.getElementById('grab-cd')?.setProperties({ text: d.playerGrabCD > 0 ? `Grab: ${d.playerGrabCD.toFixed(1)}s` : 'Grab: READY' });
-    h.getElementById('dodge-cd')?.setProperties({ text: d.playerDodgeCD > 0 ? `Dodge: ${d.playerDodgeCD.toFixed(1)}s` : 'Dodge: READY' });
-    h.getElementById('charge-cd')?.setProperties({ text: d.playerChargeCD > 0 ? `Charge: ${d.playerChargeCD.toFixed(1)}s` : 'Charge: READY' });
+    h.getElementById('push-cd')?.setProperties({ text: d.playerPushCD > 0 ? `Push: ${d.playerPushCD.toFixed(1)}s` : (d.playerStamina < 15 ? 'Push: LOW' : 'Push: READY') });
+    h.getElementById('grab-cd')?.setProperties({ text: d.playerGrabCD > 0 ? `Grab: ${d.playerGrabCD.toFixed(1)}s` : (d.playerStamina < 25 ? 'Grab: LOW' : 'Grab: READY') });
+    h.getElementById('dodge-cd')?.setProperties({ text: d.playerDodgeCD > 0 ? `Dodge: ${d.playerDodgeCD.toFixed(1)}s` : (d.playerStamina < 20 ? 'Dodge: LOW' : 'Dodge: READY') });
+    h.getElementById('charge-cd')?.setProperties({ text: d.playerChargeCD > 0 ? `Charge: ${d.playerChargeCD.toFixed(1)}s` : (d.playerStamina < 30 ? 'Charge: LOW' : 'Charge: READY') });
   }
 
   private updateResults() {
@@ -126,6 +151,21 @@ export class UISystem extends createSystem({}) {
     r.getElementById('result-record')?.setProperties({ text: `Record: ${d.wins}W - ${d.losses}L` });
     r.getElementById('result-streak')?.setProperties({ text: `Win Streak: ${d.currentStreak}` });
     r.getElementById('result-opponent')?.setProperties({ text: `Opponent: ${this.sumo.getOpponentName()}` });
+    // Tournament info
+    if (this.sumo.isTournamentChampion()) {
+      r.getElementById('tourney-result')?.setProperties({ text: `Tournament complete! ${d.tournamentWins} wins` });
+      r.getElementById('champion-text')?.setProperties({ text: '🏆 CHAMPION 🏆' });
+      r.getElementById('btn-next')?.setProperties({ text: 'MENU' });
+    } else if (d.inTournament) {
+      r.getElementById('tourney-result')?.setProperties({ text: this.sumo.getTournamentInfo() });
+      r.getElementById('champion-text')?.setProperties({ text: '' });
+    } else if (d.matchResult === 'loss' && d.tournamentWins > 0) {
+      r.getElementById('tourney-result')?.setProperties({ text: `Eliminated! Wins: ${d.tournamentWins}` });
+      r.getElementById('champion-text')?.setProperties({ text: '' });
+    } else {
+      r.getElementById('tourney-result')?.setProperties({ text: '' });
+      r.getElementById('champion-text')?.setProperties({ text: '' });
+    }
   }
 
   private updateSettings() {

@@ -24,11 +24,8 @@
       "id": "hud-panel",
       "name": "HUD Panel",
       "content": { "type": "asset", "asset": "hud-panel" },
-      "transform": { "position": [0, 2.8, -2.5], "scale": 0.4 },
-      "components": {
-        "RayInteractable": {},
-        "ScreenSpace": { "top": "10px", "left": "10px", "width": "30vw", "height": "18%" }
-      }
+      "transform": { "position": [0, 3.5, -2], "scale": 0.35 },
+      "components": { "RayInteractable": {} }
     },
     {
       "id": "pause-panel",

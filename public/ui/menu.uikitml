@@ -32,6 +32,20 @@
     font-size: 18;
     color: #ffdd88;
   }
+  .btn-tourney {
+    padding: 12;
+    background-color: rgba(180, 40, 40, 0.3);
+    border-radius: 8;
+    width: 280;
+    align-items: center;
+    cursor: pointer;
+    border-width: 1;
+    border-color: rgba(255, 100, 50, 0.5);
+  }
+  .btn-tourney-text {
+    font-size: 18;
+    color: #ff9966;
+  }
   .controls {
     font-size: 10;
     color: rgba(200, 180, 140, 0.6);
@@ -44,6 +58,9 @@
   <div class="subtitle">Sumo Wrestling Ring-Out Arcade</div>
   <div class="btn" id="btn-play">
     <div class="btn-text">FIGHT</div>
+  </div>
+  <div class="btn-tourney" id="btn-tournament">
+    <div class="btn-tourney-text">TOURNAMENT</div>
   </div>
   <div class="btn" id="btn-settings">
     <div class="btn-text">SETTINGS</div>

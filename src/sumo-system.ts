@@ -72,6 +72,8 @@ interface Wrestler {
   dodgeDir: Vector3;
   dodgeTime: number;
   heightScale: number;
+  stamina: number;
+  crouchAnim: number;
 }
 
 interface Particle {
@@ -110,6 +112,13 @@ export interface GameData {
   playerGrabCD: number;
   playerDodgeCD: number;
   playerChargeCD: number;
+  playerStamina: number;
+  inTournament: boolean;
+  tournamentRound: number;
+  tournamentBracket: OpponentDef[];
+  tournamentWins: number;
+  tachiai: boolean;
+  tachiaiTimer: number;
 }
 
 const COLOR_SCHEMES = [
@@ -126,6 +135,14 @@ const DODGE_SPEED = 8.0;
 const DODGE_DURATION = 0.25;
 const FRICTION = 4.0;
 const MATCH_TIME = 60;
+const MAX_STAMINA = 100;
+const STAMINA_REGEN = 12;
+const PUSH_STAMINA = 15;
+const GRAB_STAMINA = 25;
+const DODGE_STAMINA = 20;
+const CHARGE_STAMINA = 30;
+const LOW_STAMINA_THRESHOLD = 30;
+const TACHIAI_DURATION = 2.0;
 
 const WINNING_TECHNIQUES = [
   'Oshidashi', 'Yorikiri', 'Hatakikomi', 'Uwatenage',
@@ -176,6 +193,8 @@ export class SumoSystem extends createSystem({}) {
       roundTime: MATCH_TIME, difficulty: 1, colorScheme: 0,
       sfxOn: true, musicOn: true, matchResult: null, countdownTime: 3, isCountdown: false,
       lastAction: '', winTechnique: '', playerPushCD: 0, playerGrabCD: 0, playerDodgeCD: 0, playerChargeCD: 0,
+      playerStamina: MAX_STAMINA, inTournament: false, tournamentRound: 0,
+      tournamentBracket: [], tournamentWins: 0, tachiai: false, tachiaiTimer: 0,
     };
     this.loadStats();
     this.buildArena();
@@ -421,6 +440,7 @@ export class SumoSystem extends createSystem({}) {
       weightVal: weight, speedVal: speed, isPlayerW: isPlayer,
       pushAnim: 0, grabAnim: 0,
       dodgeDir: new Vector3(), dodgeTime: 0, heightScale: sc,
+      stamina: MAX_STAMINA, crouchAnim: 0,
     };
   }
 
@@ -437,6 +457,8 @@ export class SumoSystem extends createSystem({}) {
       w.dodgeCooldown = 0;
       w.chargeCooldown = 0;
       w.dodgeTime = 0;
+      w.stamina = MAX_STAMINA;
+      w.crouchAnim = 0;
     };
     reset(this.playerW, 0, 1.5, Math.PI);
     reset(this.opponentW, 0, -1.5, 0);
@@ -450,21 +472,59 @@ export class SumoSystem extends createSystem({}) {
     const c = new Color(def.color);
     (this.opponentW.belt.material as MeshStandardMaterial).color.copy(c);
     (this.opponentW.belt.material as MeshStandardMaterial).emissive.copy(c);
+    // Visual variety based on stats
+    const wScale = 0.85 + def.weight * 0.2;
+    const hScale = 1.0 + (def.speed - 1.0) * 0.1;
+    this.opponentW.group.scale.set(wScale, hScale, wScale);
+    // Skin tone variety per opponent
+    const skinHue = (OPPONENT_POOL.indexOf(def) * 0.025) % 0.1;
+    const skin = new Color().setHSL(0.08 + skinHue, 0.45, 0.55);
+    (this.opponentW.body.material as MeshStandardMaterial).color.copy(skin);
+    (this.opponentW.head.material as MeshStandardMaterial).color.copy(skin);
   }
 
   startMatch() {
-    const idx = Math.min(this.gameData.currentRank + Math.floor(Math.random() * 3), OPPONENT_POOL.length - 1);
-    const oppDef = OPPONENT_POOL[idx];
+    let oppDef: OpponentDef;
+    if (this.gameData.inTournament) {
+      oppDef = this.gameData.tournamentBracket[this.gameData.tournamentRound];
+    } else {
+      const idx = Math.min(this.gameData.currentRank + Math.floor(Math.random() * 3), OPPONENT_POOL.length - 1);
+      oppDef = OPPONENT_POOL[idx];
+    }
     this.gameData.currentOpponent = oppDef;
     this.gameData.matchNumber++;
     this.gameData.roundTime = MATCH_TIME;
     this.gameData.matchResult = null;
     this.gameData.countdownTime = 3;
     this.gameData.isCountdown = true;
+    this.gameData.tachiai = true;
+    this.gameData.tachiaiTimer = TACHIAI_DURATION;
+    this.gameData.playerStamina = MAX_STAMINA;
     this.configureOpponent(oppDef);
     this.resetPositions();
     this.clearFall();
+    // Salt throw particles
+    this.spawnSalt(this.playerW.pos);
+    this.spawnSalt(this.opponentW.pos);
     this.gameData.state = 'playing';
+  }
+
+  startTournament() {
+    const shuffled = [...OPPONENT_POOL].sort(() => Math.random() - 0.5);
+    this.gameData.tournamentBracket = shuffled.slice(0, 8);
+    this.gameData.inTournament = true;
+    this.gameData.tournamentRound = 0;
+    this.gameData.tournamentWins = 0;
+    this.startMatch();
+  }
+
+  private spawnSalt(pos: Vector3) {
+    for (let i = 0; i < 12; i++) {
+      const m = new Mesh(new SphereGeometry(0.015, 4, 3), new MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffee, emissiveIntensity: 0.6, transparent: true, opacity: 0.8 }));
+      m.position.copy(pos).setY(0.8);
+      this.scene.add(m);
+      this.particles.push({ mesh: m, vel: new Vector3((Math.random() - 0.5) * 3, Math.random() * 4 + 2, (Math.random() - 0.5) * 3), life: 0.8 + Math.random() * 0.4, maxLife: 1.0 });
+    }
   }
 
   private clearFall() {
@@ -477,9 +537,27 @@ export class SumoSystem extends createSystem({}) {
   update(delta: number, time: number) {
     const dt = Math.min(delta, 0.05);
     if (this.gameData.state === 'playing') {
-      if (this.gameData.isCountdown) {
+      if (this.gameData.tachiai) {
+        this.gameData.tachiaiTimer -= dt;
+        // Crouch animation during tachiai
+        this.playerW.crouchAnim = Math.min(1, this.playerW.crouchAnim + dt * 3);
+        this.opponentW.crouchAnim = Math.min(1, this.opponentW.crouchAnim + dt * 3);
+        if (this.gameData.tachiaiTimer <= 0) {
+          this.gameData.tachiai = false;
+          this.gameData.isCountdown = true;
+          this.gameData.countdownTime = 3;
+          this.playerW.crouchAnim = 0;
+          this.opponentW.crouchAnim = 0;
+        }
+      } else if (this.gameData.isCountdown) {
         this.gameData.countdownTime -= dt;
-        if (this.gameData.countdownTime <= 0) this.gameData.isCountdown = false;
+        if (this.gameData.countdownTime <= 0) {
+          this.gameData.isCountdown = false;
+          // Tachiai charge: both wrestlers surge forward
+          this.playerW.vel.z = -2.5;
+          this.opponentW.vel.z = 2.5;
+          this.sfx('charge');
+        }
       } else {
         this.updatePlayerInput(dt);
         this.updateAI(dt);
@@ -489,12 +567,16 @@ export class SumoSystem extends createSystem({}) {
         if (this.gameData.roundTime <= 0) this.endMatch('timeout');
         this.updateFootsteps(dt);
         this.updateCrowdExcitement(dt);
+        // Stamina regen
+        this.playerW.stamina = Math.min(MAX_STAMINA, this.playerW.stamina + STAMINA_REGEN * dt);
+        this.opponentW.stamina = Math.min(MAX_STAMINA, this.opponentW.stamina + STAMINA_REGEN * dt);
       }
-      // Expose cooldowns to HUD
+      // Expose cooldowns and stamina to HUD
       this.gameData.playerPushCD = this.playerW.pushCooldown;
       this.gameData.playerGrabCD = this.playerW.grabCooldown;
       this.gameData.playerDodgeCD = this.playerW.dodgeCooldown;
       this.gameData.playerChargeCD = this.playerW.chargeCooldown;
+      this.gameData.playerStamina = this.playerW.stamina;
     }
     if (this.fallGroup) {
       this.fallAnim += dt;
@@ -547,7 +629,7 @@ export class SumoSystem extends createSystem({}) {
 
     const ml = Math.sqrt(mx * mx + mz * mz);
     if (ml > 0.1) {
-      const sp = 3.5 * p.speedVal;
+      const sp = 3.5 * p.speedVal * (p.stamina < LOW_STAMINA_THRESHOLD ? 0.6 : 1.0);
       p.vel.x += (mx / ml) * sp * dt;
       p.vel.z += (mz / ml) * sp * dt;
       p.facing = Math.atan2(this.opponentW.pos.x - p.pos.x, this.opponentW.pos.z - p.pos.z);
@@ -555,27 +637,30 @@ export class SumoSystem extends createSystem({}) {
 
     // Push
     const rTrig = rGP ? rGP.getButtonDown(InputComponent.Trigger) : false;
-    if ((kb.getKeyDown('Space') || rTrig) && p.pushCooldown <= 0) {
+    if ((kb.getKeyDown('Space') || rTrig) && p.pushCooldown <= 0 && p.stamina >= PUSH_STAMINA) {
       this.doPush(p, this.opponentW);
       p.pushCooldown = 0.5;
+      p.stamina -= PUSH_STAMINA;
       this.gameData.totalPushes++;
       this.gameData.lastAction = 'push';
     }
 
     // Grab
     const rGrip = rGP ? rGP.getButtonDown(InputComponent.Squeeze) : false;
-    if ((kb.getKeyDown('KeyE') || rGrip) && p.grabCooldown <= 0) {
+    if ((kb.getKeyDown('KeyE') || rGrip) && p.grabCooldown <= 0 && p.stamina >= GRAB_STAMINA) {
       this.doGrab(p, this.opponentW);
       p.grabCooldown = 1.5;
+      p.stamina -= GRAB_STAMINA;
       this.gameData.totalGrabs++;
       this.gameData.lastAction = 'grab';
     }
 
     // Dodge
     const lTrig = lGP ? lGP.getButtonDown(InputComponent.Trigger) : false;
-    if ((kb.getKeyDown('ShiftLeft') || kb.getKeyDown('ShiftRight') || lTrig) && p.dodgeCooldown <= 0) {
+    if ((kb.getKeyDown('ShiftLeft') || kb.getKeyDown('ShiftRight') || lTrig) && p.dodgeCooldown <= 0 && p.stamina >= DODGE_STAMINA) {
       this.doDodge(p, mx, mz);
       p.dodgeCooldown = 1.0;
+      p.stamina -= DODGE_STAMINA;
       this.gameData.totalDodges++;
     }
 
@@ -584,7 +669,7 @@ export class SumoSystem extends createSystem({}) {
       p.isCharging = true;
       p.chargeTime += dt;
     } else if (p.isCharging) {
-      if (p.chargeTime > 0.3) { this.doCharge(p, this.opponentW); this.gameData.lastAction = 'charge'; }
+      if (p.chargeTime > 0.3 && p.stamina >= CHARGE_STAMINA) { this.doCharge(p, this.opponentW); p.stamina -= CHARGE_STAMINA; this.gameData.lastAction = 'charge'; }
       p.isCharging = false;
       p.chargeTime = 0;
       p.chargeCooldown = 2.0;
@@ -681,35 +766,52 @@ export class SumoSystem extends createSystem({}) {
     o.facing = Math.atan2(this.playerW.pos.x - o.pos.x, this.playerW.pos.z - o.pos.z);
     const odc = Math.sqrt(o.pos.x ** 2 + o.pos.z ** 2);
     const pdc = Math.sqrt(this.playerW.pos.x ** 2 + this.playerW.pos.z ** 2);
-    const ms = 2.5 * o.speedVal;
+    const ms = 2.5 * o.speedVal * (o.stamina < LOW_STAMINA_THRESHOLD ? 0.6 : 1.0);
 
     if (odc > RING_RADIUS * 0.7) {
       o.vel.add(new Vector3(-o.pos.x, 0, -o.pos.z).normalize().multiplyScalar(ms * dt * 2));
     } else if (dist > 2.0) {
       if (Math.random() < od.aggression) o.vel.add(tp.clone().multiplyScalar(ms * dt));
     } else if (dist > 1.0) {
-      if (Math.random() < od.technique * 0.5) {
-        o.vel.add(new Vector3(-tp.z, 0, tp.x).multiplyScalar(ms * dt * 0.7));
+      // Enhanced AI: sidestep maneuver for technical opponents
+      if (Math.random() < od.technique * 0.6) {
+        const side = Math.random() > 0.5 ? 1 : -1;
+        o.vel.add(new Vector3(-tp.z * side, 0, tp.x * side).multiplyScalar(ms * dt * 0.9));
       } else {
         o.vel.add(tp.clone().multiplyScalar(ms * dt * 0.8));
       }
     }
 
-    if (dist < 1.2 && o.pushCooldown <= 0 && Math.random() < od.aggression * 0.8 * dt * 3) {
+    // Enhanced AI: feint attack (juke toward then dodge away)
+    if (dist < 1.5 && dist > 1.0 && od.technique > 0.5 && Math.random() < od.technique * 0.2 * dt) {
+      o.vel.add(new Vector3(-tp.z, 0, tp.x).multiplyScalar(ms * 1.5));
+      this.spawn(o.pos.clone().setY(0.6), 0xffff44, 3);
+    }
+
+    // Defensive stance near ring edge
+    if (odc > RING_RADIUS * 0.6 && od.technique > 0.4) {
+      o.vel.add(new Vector3(-o.pos.x, 0, -o.pos.z).normalize().multiplyScalar(ms * dt * 1.5));
+    }
+
+    if (dist < 1.2 && o.pushCooldown <= 0 && o.stamina >= PUSH_STAMINA && Math.random() < od.aggression * 0.8 * dt * 3) {
       this.doAIPush(o, this.playerW);
       o.pushCooldown = 0.6 / o.speedVal;
+      o.stamina -= PUSH_STAMINA;
     }
-    if (dist < 1.0 && o.grabCooldown <= 0 && Math.random() < od.technique * 0.5 * dt * 2) {
+    if (dist < 1.0 && o.grabCooldown <= 0 && o.stamina >= GRAB_STAMINA && Math.random() < od.technique * 0.5 * dt * 2) {
       this.doAIGrab(o, this.playerW);
       o.grabCooldown = 2.0 / o.speedVal;
+      o.stamina -= GRAB_STAMINA;
     }
-    if (pdc > RING_RADIUS * 0.6 && dist < 2.5 && o.chargeCooldown <= 0 && Math.random() < od.aggression * dt) {
+    if (pdc > RING_RADIUS * 0.6 && dist < 2.5 && o.chargeCooldown <= 0 && o.stamina >= CHARGE_STAMINA && Math.random() < od.aggression * dt) {
       this.doCharge(o, this.playerW);
       o.chargeCooldown = 3.0;
+      o.stamina -= CHARGE_STAMINA;
     }
-    if (this.playerW.isCharging && dist < 2.0 && o.dodgeCooldown <= 0 && Math.random() < od.technique * 0.6) {
+    if (this.playerW.isCharging && dist < 2.0 && o.dodgeCooldown <= 0 && o.stamina >= DODGE_STAMINA && Math.random() < od.technique * 0.6) {
       o.vel.add(new Vector3(-tp.z, 0, tp.x).multiplyScalar(DODGE_SPEED * 0.4));
       o.dodgeCooldown = 1.5;
+      o.stamina -= DODGE_STAMINA;
       this.spawn(o.pos.clone().setY(0.5), 0x44ff44, 4);
     }
 
@@ -800,15 +902,40 @@ export class SumoSystem extends createSystem({}) {
       this.gameData.score += 500 + Math.floor(this.gameData.roundTime * 10) + (this.gameData.currentRank + 1) * 100;
       if (this.gameData.matchWins % 3 === 0 && this.gameData.currentRank < RANKS.length - 1) this.gameData.currentRank++;
       this.gameData.winTechnique = getWinningTechnique(this.gameData.lastAction);
+      if (this.gameData.inTournament) {
+        this.gameData.tournamentWins++;
+        this.gameData.tournamentRound++;
+        if (this.gameData.tournamentRound >= this.gameData.tournamentBracket.length) {
+          this.gameData.score += 5000; // Tournament champion bonus
+        }
+      }
     } else if (result === 'loss') {
       this.gameData.losses++;
       this.gameData.currentStreak = 0;
       this.gameData.winTechnique = '';
+      if (this.gameData.inTournament) {
+        this.gameData.inTournament = false; // Eliminated
+      }
     } else {
       const pd = Math.sqrt(this.playerW.pos.x ** 2 + this.playerW.pos.z ** 2);
       const od = Math.sqrt(this.opponentW.pos.x ** 2 + this.opponentW.pos.z ** 2);
-      if (pd < od) { this.gameData.matchResult = 'win'; this.gameData.wins++; this.gameData.matchWins++; this.gameData.score += 300; this.gameData.winTechnique = 'Yorikiri'; }
-      else { this.gameData.matchResult = 'loss'; this.gameData.losses++; this.gameData.currentStreak = 0; this.gameData.winTechnique = ''; }
+      if (pd < od) {
+        this.gameData.matchResult = 'win';
+        this.gameData.wins++;
+        this.gameData.matchWins++;
+        this.gameData.score += 300;
+        this.gameData.winTechnique = 'Yorikiri';
+        if (this.gameData.inTournament) {
+          this.gameData.tournamentWins++;
+          this.gameData.tournamentRound++;
+        }
+      } else {
+        this.gameData.matchResult = 'loss';
+        this.gameData.losses++;
+        this.gameData.currentStreak = 0;
+        this.gameData.winTechnique = '';
+        if (this.gameData.inTournament) this.gameData.inTournament = false;
+      }
     }
     this.saveStats();
     this.gameData.state = 'results';
@@ -818,19 +945,31 @@ export class SumoSystem extends createSystem({}) {
     for (const w of [this.playerW, this.opponentW]) {
       w.group.position.set(w.pos.x, 0, w.pos.z);
       w.group.rotation.y = w.facing;
-      if (w.pushAnim > 0) w.arms.rotation.x = -w.pushAnim * 0.8;
+      // Crouch animation for tachiai
+      if (w.crouchAnim > 0) {
+        w.body.position.y = (0.5 * w.heightScale + 0.4) - w.crouchAnim * 0.15;
+        w.head.position.y = (0.9 * w.heightScale + 0.4) - w.crouchAnim * 0.12;
+        w.arms.position.y = (0.6 * w.heightScale + 0.4) - w.crouchAnim * 0.1;
+        w.arms.rotation.x = -w.crouchAnim * 0.4;
+      } else if (w.pushAnim > 0) w.arms.rotation.x = -w.pushAnim * 0.8;
       else if (w.grabAnim > 0) { w.arms.rotation.x = -w.grabAnim * 0.5; w.leftArm.rotation.z = Math.PI / 4 - w.grabAnim * 0.4; w.rightArm.rotation.z = -Math.PI / 4 + w.grabAnim * 0.4; }
       else { w.arms.rotation.x = 0; w.leftArm.rotation.z = Math.PI / 4; w.rightArm.rotation.z = -Math.PI / 4; }
       w.group.rotation.z = w.stagger > 0 ? Math.sin(time * 20) * 0.1 * w.stagger : 0;
       if (w.isCharging) {
         const i = Math.min(w.chargeTime * 2, 1);
         (w.belt.material as MeshStandardMaterial).emissiveIntensity = 0.4 + i * 1.5;
-        w.group.scale.set(1 + i * 0.1, 1, 1 + i * 0.1);
+        if (w.crouchAnim <= 0) w.group.scale.set(1 + i * 0.1, 1, 1 + i * 0.1);
       } else {
         (w.belt.material as MeshStandardMaterial).emissiveIntensity = 0.4;
-        w.group.scale.set(1, 1, 1);
+        if (w.crouchAnim <= 0 && w.isPlayerW) w.group.scale.set(1, 1, 1);
       }
-      w.body.position.y = 0.5 * w.heightScale + 0.4 + Math.sin(time * 3 + (w.isPlayerW ? 0 : 1)) * 0.02;
+      if (w.crouchAnim <= 0) {
+        w.body.position.y = 0.5 * w.heightScale + 0.4 + Math.sin(time * 3 + (w.isPlayerW ? 0 : 1)) * 0.02;
+      }
+      // Low stamina visual: belt flickers when tired
+      if (w.stamina < LOW_STAMINA_THRESHOLD) {
+        (w.belt.material as MeshStandardMaterial).emissiveIntensity = 0.2 + Math.sin(time * 8) * 0.15;
+      }
     }
 
     // Apply full color scheme
@@ -898,6 +1037,16 @@ export class SumoSystem extends createSystem({}) {
   getRankName(): string { return RANKS[Math.min(this.gameData.currentRank, RANKS.length - 1)]; }
   getOpponentName(): string { return this.gameData.currentOpponent?.name ?? 'UNKNOWN'; }
   getWinTechnique(): string { return this.gameData.winTechnique; }
+  getTournamentInfo(): string {
+    if (!this.gameData.inTournament) return '';
+    const round = this.gameData.tournamentRound;
+    const total = this.gameData.tournamentBracket.length;
+    if (round >= total) return 'TOURNAMENT CHAMPION!';
+    const names = ['Quarterfinal', 'Semifinal', 'Final'];
+    const roundName = total <= 4 ? names[round] ?? `Round ${round + 1}` : round < total - 3 ? `Round ${round + 1}` : names[3 - (total - round)] ?? `Round ${round + 1}`;
+    return `Tournament: ${roundName} (${round}/${total})`;
+  }
+  isTournamentChampion(): boolean { return this.gameData.inTournament && this.gameData.tournamentRound >= this.gameData.tournamentBracket.length; }
   setDifficulty(d: number) { this.gameData.difficulty = d; }
   setColorScheme(c: number) { this.gameData.colorScheme = c; }
   setSfx(on: boolean) { this.gameData.sfxOn = on; }

@@ -49,11 +49,21 @@
     width: 300;
     background-color: rgba(255, 170, 50, 0.3);
   }
+  .tourney-result {
+    font-size: 14;
+    color: #ffaa88;
+  }
+  .champion {
+    font-size: 24;
+    color: #ffdd44;
+  }
 </style>
 <Panel class="root">
   <div class="title" id="result-title">VICTORY!</div>
   <div class="technique" id="result-technique">Kimarite: Oshidashi</div>
   <div class="divider"></div>
+  <div class="tourney-result" id="tourney-result"></div>
+  <div class="champion" id="champion-text"></div>
   <div class="highlight" id="result-opponent">Opponent: TARO</div>
   <div class="stat" id="result-score">Score: 0</div>
   <div class="stat" id="result-rank">Rank: Jonokuchi</div>

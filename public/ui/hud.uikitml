@@ -42,6 +42,11 @@
     color: #ffffff;
     align-items: center;
   }
+  .tachiai-text {
+    font-size: 16;
+    color: #ffcc44;
+    align-items: center;
+  }
   .pause-btn {
     padding: 4;
     background-color: rgba(255, 255, 255, 0.15);
@@ -69,9 +74,30 @@
     width: 280;
     background-color: rgba(255, 170, 50, 0.2);
   }
+  .stamina-outer {
+    width: 280;
+    height: 10;
+    background-color: rgba(50, 50, 50, 0.8);
+    border-radius: 4;
+  }
+  .stamina-inner {
+    width: 280;
+    height: 10;
+    background-color: #44cc44;
+    border-radius: 4;
+  }
+  .stamina-label {
+    font-size: 10;
+    color: rgba(180, 220, 180, 0.8);
+  }
+  .tourney-info {
+    font-size: 12;
+    color: #ffaa88;
+  }
 </style>
 <Panel class="root">
   <div class="countdown" id="countdown"></div>
+  <div class="tachiai-text" id="tachiai-text"></div>
   <div class="row">
     <div class="score" id="score">Score: 0</div>
     <div class="time" id="time">Time: 60s</div>
@@ -84,7 +110,14 @@
     <div class="opponent" id="opponent-name">VS TARO</div>
     <div class="streak" id="streak"></div>
   </div>
+  <div class="tourney-info" id="tourney-info"></div>
   <div class="divider"></div>
+  <div class="row">
+    <div class="stamina-label" id="stamina-label">Stamina: 100%</div>
+  </div>
+  <div class="stamina-outer">
+    <div class="stamina-inner" id="stamina-bar"></div>
+  </div>
   <div class="cd-row">
     <div class="cd-text" id="push-cd">Push: READY</div>
     <div class="cd-text" id="grab-cd">Grab: READY</div>
