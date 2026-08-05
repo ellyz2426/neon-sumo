@@ -1,0 +1,82 @@
+<style>
+  .root {
+    flex-direction: column;
+    padding: 10;
+    gap: 4;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 8;
+    width: 280;
+  }
+  .row {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 260;
+    align-items: center;
+  }
+  .score {
+    font-size: 20;
+    color: #ffcc44;
+  }
+  .time {
+    font-size: 18;
+    color: #ff8844;
+  }
+  .rank {
+    font-size: 14;
+    color: #88ccff;
+  }
+  .opponent {
+    font-size: 16;
+    color: #ff6644;
+  }
+  .info {
+    font-size: 12;
+    color: rgba(200, 200, 200, 0.8);
+  }
+  .streak {
+    font-size: 14;
+    color: #ffaa00;
+  }
+  .countdown {
+    font-size: 32;
+    color: #ffffff;
+    align-items: center;
+  }
+  .pause-btn {
+    padding: 4;
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 4;
+    cursor: pointer;
+    align-items: center;
+    width: 60;
+  }
+  .pause-text {
+    font-size: 10;
+    color: rgba(255, 255, 255, 0.7);
+  }
+  .cd-text {
+    font-size: 12;
+    color: rgba(180, 180, 180, 0.7);
+  }
+</style>
+<Panel class="root">
+  <div class="countdown" id="countdown"></div>
+  <div class="row">
+    <div class="score" id="score">Score: 0</div>
+    <div class="time" id="time">Time: 60s</div>
+  </div>
+  <div class="row">
+    <div class="rank" id="rank">Rank: Jonokuchi</div>
+    <div class="info" id="match-num">Match 1</div>
+  </div>
+  <div class="row">
+    <div class="opponent" id="opponent-name">VS TARO</div>
+    <div class="streak" id="streak"></div>
+  </div>
+  <div class="row">
+    <div class="cd-text" id="push-cd">Push: READY</div>
+    <div class="pause-btn" id="btn-pause">
+      <div class="pause-text">PAUSE</div>
+    </div>
+  </div>
+</Panel>

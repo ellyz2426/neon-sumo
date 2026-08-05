@@ -1,0 +1,62 @@
+{
+  "name": "Neon Sumo VR",
+  "root": {
+    "id": "root",
+    "name": "Root",
+    "children": [
+      "menu-panel",
+      "hud-panel",
+      "pause-panel",
+      "results-panel",
+      "settings-panel",
+      "stats-panel"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "menu-panel",
+      "name": "Menu Panel",
+      "content": { "type": "asset", "asset": "menu-panel" },
+      "transform": { "position": [0, 2.0, -3], "scale": 0.5 },
+      "components": { "RayInteractable": {} }
+    },
+    {
+      "id": "hud-panel",
+      "name": "HUD Panel",
+      "content": { "type": "asset", "asset": "hud-panel" },
+      "transform": { "position": [0, 2.8, -2.5], "scale": 0.4 },
+      "components": {
+        "RayInteractable": {},
+        "ScreenSpace": { "top": "10px", "left": "10px", "width": "30vw", "height": "18%" }
+      }
+    },
+    {
+      "id": "pause-panel",
+      "name": "Pause Panel",
+      "content": { "type": "asset", "asset": "pause-panel" },
+      "transform": { "position": [0, 2.0, -2.5], "scale": 0.5 },
+      "components": { "RayInteractable": {} }
+    },
+    {
+      "id": "results-panel",
+      "name": "Results Panel",
+      "content": { "type": "asset", "asset": "results-panel" },
+      "transform": { "position": [0, 2.0, -3], "scale": 0.5 },
+      "components": { "RayInteractable": {} }
+    },
+    {
+      "id": "settings-panel",
+      "name": "Settings Panel",
+      "content": { "type": "asset", "asset": "settings-panel" },
+      "transform": { "position": [0, 2.0, -3], "scale": 0.45 },
+      "components": { "RayInteractable": {} }
+    },
+    {
+      "id": "stats-panel",
+      "name": "Stats Panel",
+      "content": { "type": "asset", "asset": "stats-panel" },
+      "transform": { "position": [0, 2.0, -3], "scale": 0.45 },
+      "components": { "RayInteractable": {} }
+    }
+  ]
+}

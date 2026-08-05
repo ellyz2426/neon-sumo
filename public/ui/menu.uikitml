@@ -1,0 +1,56 @@
+<style>
+  .root {
+    flex-direction: column;
+    align-items: center;
+    padding: 30;
+    gap: 16;
+    background-color: rgba(10, 0, 0, 0.94);
+    border-radius: 16;
+    border-width: 2;
+    border-color: rgba(255, 170, 50, 0.6);
+    width: 380;
+  }
+  .title {
+    font-size: 36;
+    color: #ffcc44;
+  }
+  .subtitle {
+    font-size: 14;
+    color: rgba(255, 200, 100, 0.7);
+  }
+  .btn {
+    padding: 12;
+    background-color: rgba(200, 120, 30, 0.25);
+    border-radius: 8;
+    width: 280;
+    align-items: center;
+    cursor: pointer;
+    border-width: 1;
+    border-color: rgba(255, 170, 50, 0.4);
+  }
+  .btn-text {
+    font-size: 18;
+    color: #ffdd88;
+  }
+  .controls {
+    font-size: 10;
+    color: rgba(200, 180, 140, 0.6);
+    width: 280;
+    align-items: center;
+  }
+</style>
+<Panel class="root">
+  <div class="title">NEON SUMO</div>
+  <div class="subtitle">Sumo Wrestling Ring-Out Arcade</div>
+  <div class="btn" id="btn-play">
+    <div class="btn-text">FIGHT</div>
+  </div>
+  <div class="btn" id="btn-settings">
+    <div class="btn-text">SETTINGS</div>
+  </div>
+  <div class="btn" id="btn-stats">
+    <div class="btn-text">STATS</div>
+  </div>
+  <div class="controls">WASD Move | Space Push | E Grab | Shift Dodge | Q Charge</div>
+  <div class="controls">VR: Thumbstick Move | Trigger Push | Grip Grab</div>
+</Panel>

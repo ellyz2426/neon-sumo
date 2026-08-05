@@ -1,0 +1,59 @@
+<style>
+  .root {
+    flex-direction: column;
+    align-items: center;
+    padding: 30;
+    gap: 10;
+    background-color: rgba(10, 0, 0, 0.94);
+    border-radius: 16;
+    border-width: 2;
+    border-color: rgba(255, 170, 50, 0.6);
+    width: 380;
+  }
+  .title {
+    font-size: 32;
+    color: #ffcc44;
+  }
+  .stat {
+    font-size: 16;
+    color: rgba(220, 200, 160, 0.9);
+  }
+  .highlight {
+    font-size: 18;
+    color: #ff8844;
+  }
+  .btn {
+    padding: 12;
+    background-color: rgba(200, 120, 30, 0.25);
+    border-radius: 8;
+    width: 240;
+    align-items: center;
+    cursor: pointer;
+    border-width: 1;
+    border-color: rgba(255, 170, 50, 0.4);
+  }
+  .btn-text {
+    font-size: 16;
+    color: #ffdd88;
+  }
+  .row {
+    flex-direction: row;
+    gap: 16;
+  }
+</style>
+<Panel class="root">
+  <div class="title" id="result-title">VICTORY!</div>
+  <div class="highlight" id="result-opponent">Opponent: TARO</div>
+  <div class="stat" id="result-score">Score: 0</div>
+  <div class="stat" id="result-rank">Rank: Jonokuchi</div>
+  <div class="stat" id="result-record">Record: 0W - 0L</div>
+  <div class="stat" id="result-streak">Win Streak: 0</div>
+  <div class="row">
+    <div class="btn" id="btn-next">
+      <div class="btn-text">NEXT MATCH</div>
+    </div>
+    <div class="btn" id="btn-menu">
+      <div class="btn-text">MENU</div>
+    </div>
+  </div>
+</Panel>
