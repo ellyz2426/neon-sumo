@@ -3,7 +3,7 @@
     flex-direction: column;
     align-items: center;
     padding: 30;
-    gap: 14;
+    gap: 12;
     background-color: rgba(10, 0, 0, 0.94);
     border-radius: 16;
     border-width: 2;
@@ -46,6 +46,20 @@
     font-size: 18;
     color: #ff9966;
   }
+  .btn-survival {
+    padding: 12;
+    background-color: rgba(120, 30, 180, 0.3);
+    border-radius: 8;
+    width: 280;
+    align-items: center;
+    cursor: pointer;
+    border-width: 1;
+    border-color: rgba(180, 80, 255, 0.5);
+  }
+  .btn-survival-text {
+    font-size: 18;
+    color: #cc88ff;
+  }
   .btn-training {
     padding: 12;
     background-color: rgba(40, 120, 40, 0.25);
@@ -76,6 +90,9 @@
   <div class="btn-tourney" id="btn-tournament">
     <div class="btn-tourney-text">TOURNAMENT</div>
   </div>
+  <div class="btn-survival" id="btn-survival">
+    <div class="btn-survival-text">SURVIVAL</div>
+  </div>
   <div class="btn-training" id="btn-training">
     <div class="btn-training-text">TRAINING</div>
   </div>
@@ -85,6 +102,7 @@
   <div class="btn" id="btn-stats">
     <div class="btn-text">STATS</div>
   </div>
-  <div class="controls">WASD Move | Space Push | E Grab | Shift Dodge | Q Charge | F Henka</div>
-  <div class="controls">VR: Thumbstick Move | R-Trigger Push | R-Grip Grab | L-Trigger Dodge | L-Grip Henka</div>
+  <div class="controls">WASD Move | Space Push | E Grab | Shift Dodge | Q Charge | F Henka | R Harite*</div>
+  <div class="controls">VR: Thumbstick | R-Trigger Push | R-Grip Grab | L-Trigger Dodge | L-Grip Henka</div>
+  <div class="controls">*Harite unlocks at Komusubi rank</div>
 </Panel>

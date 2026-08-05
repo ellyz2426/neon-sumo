@@ -30,6 +30,10 @@
     font-size: 16;
     color: #ff44ff;
   }
+  .upset {
+    font-size: 16;
+    color: #ffdd44;
+  }
   .btn {
     padding: 12;
     background-color: rgba(200, 120, 30, 0.25);
@@ -66,6 +70,7 @@
   <div class="title" id="result-title">VICTORY!</div>
   <div class="technique" id="result-technique">Kimarite: Oshidashi</div>
   <div class="combo" id="result-combo"></div>
+  <div class="upset" id="upset-text"></div>
   <div class="divider"></div>
   <div class="tourney-result" id="tourney-result"></div>
   <div class="champion" id="champion-text"></div>

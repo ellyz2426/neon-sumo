@@ -19,6 +19,11 @@
     color: rgba(220, 200, 160, 0.9);
     width: 320;
   }
+  .stat-highlight {
+    font-size: 14;
+    color: rgba(200, 160, 255, 0.9);
+    width: 320;
+  }
   .divider {
     height: 1;
     width: 320;
@@ -66,6 +71,8 @@
   <div class="divider"></div>
   <div class="stat" id="stat-score">Total Score: 0</div>
   <div class="stat" id="stat-streak">Best Streak: 0</div>
+  <div class="stat-highlight" id="stat-survival">Survival Best: Wave 0</div>
+  <div class="divider"></div>
   <div class="stat" id="stat-pushes">Total Pushes: 0</div>
   <div class="stat" id="stat-grabs">Total Grabs: 0</div>
   <div class="stat" id="stat-dodges">Total Dodges: 0</div>

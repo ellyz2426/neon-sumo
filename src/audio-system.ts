@@ -90,11 +90,17 @@ export class AudioSystem extends createSystem({}) {
   update(delta: number) {
     if (!this.ctx || !this.musicGain) return;
     const d = this.sumo.getGameData();
-    if (d.state === 'playing' && d.musicOn && !d.isCountdown) {
+    if ((d.state === 'playing' || d.state === 'survival') && d.musicOn && !d.isCountdown) {
       if (!this.musicPlaying) { this.musicPlaying = true; this.musicBeat = 0; this.beatTimer = 0; }
+      // Dynamic tempo: base 80 BPM, scales up near ring edge and during combos
+      const pd = Math.sqrt(d.playerStamina); // Lower stamina → more tension
+      const edgeTension = Math.max(0, 1 - pd / 10); // 0..1 scale
+      const comboBoost = Math.min(d.comboCount * 5, 20);
+      this.bpm = 80 + Math.floor(edgeTension * 30) + comboBoost;
       this.tickMusic(delta);
     } else if (this.musicPlaying) {
       this.musicPlaying = false;
+      this.bpm = 80;
     }
     if (this.master) this.master.gain.value = d.sfxOn ? 0.3 : 0;
   }

@@ -79,6 +79,10 @@
     font-size: 10;
     color: rgba(180, 180, 180, 0.7);
   }
+  .cd-text-gold {
+    font-size: 10;
+    color: rgba(255, 200, 80, 0.8);
+  }
   .divider {
     height: 1;
     width: 300;
@@ -138,7 +142,7 @@
   <div class="cd-row">
     <div class="cd-text" id="dodge-cd">Dodge: READY</div>
     <div class="cd-text" id="charge-cd">Charge: READY</div>
-    <div class="cd-text"></div>
+    <div class="cd-text-gold" id="harite-cd"></div>
   </div>
   <div class="cd-row">
     <div class="cd-text"></div>

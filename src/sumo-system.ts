@@ -19,7 +19,7 @@ import {
   ConeGeometry,
 } from 'three';
 
-export type GameState = 'menu' | 'playing' | 'paused' | 'results' | 'settings' | 'stats' | 'training';
+export type GameState = 'menu' | 'playing' | 'paused' | 'results' | 'settings' | 'stats' | 'training' | 'survival';
 
 const RANKS = ['Jonokuchi', 'Jonidan', 'Sandanme', 'Makushita', 'Juryo', 'Maegashira', 'Komusubi', 'Sekiwake', 'Ozeki', 'Yokozuna'];
 
@@ -130,6 +130,13 @@ export interface GameData {
   comboCount: number;
   comboTimer: number;
   lastComboText: string;
+  inSurvival: boolean;
+  survivalWave: number;
+  survivalKills: number;
+  survivalBestWave: number;
+  hariteCooldown: number;
+  isUpsetWin: boolean;
+  zabutonActive: boolean;
 }
 
 const COLOR_SCHEMES = [
@@ -158,6 +165,9 @@ const TACHIAI_DURATION = 2.0;
 const HENKA_FORCE = 5.0;
 const SLOWMO_DURATION = 0.6;
 const COMBO_WINDOW = 2.0;
+const HARITE_FORCE = 8.0;
+const HARITE_STAMINA = 35;
+const HARITE_STUN = 0.6;
 
 const WINNING_TECHNIQUES = [
   'Oshidashi', 'Yorikiri', 'Hatakikomi', 'Uwatenage',
@@ -170,6 +180,7 @@ function getWinningTechnique(lastAction: string): string {
   if (lastAction === 'grab') return WINNING_TECHNIQUES[Math.random() < 0.5 ? 1 : 3];
   if (lastAction === 'charge') return WINNING_TECHNIQUES[Math.random() < 0.5 ? 5 : 9];
   if (lastAction === 'henka') return WINNING_TECHNIQUES[2]; // Hatakikomi
+  if (lastAction === 'harite') return 'Harite'; // Palm strike — not in standard list
   return WINNING_TECHNIQUES[Math.floor(Math.random() * WINNING_TECHNIQUES.length)];
 }
 
@@ -208,6 +219,8 @@ export class SumoSystem extends createSystem({}) {
   private celebrationActive = false;
   private celebrationTimer = 0;
   private celebrationParticles: Particle[] = [];
+  private zabutonParticles: Particle[] = [];
+  private zabutonTimer = 0;
 
   init() {
     this.gameData = {
@@ -222,6 +235,8 @@ export class SumoSystem extends createSystem({}) {
       tournamentBracket: [], tournamentWins: 0, tachiai: false, tachiaiTimer: 0,
       isTraining: false, slowMo: 1, slowMoTimer: 0,
       comboCount: 0, comboTimer: 0, lastComboText: '',
+      inSurvival: false, survivalWave: 0, survivalKills: 0, survivalBestWave: 0,
+      hariteCooldown: 0, isUpsetWin: false, zabutonActive: false,
     };
     this.loadStats();
     this.buildArena();
@@ -595,6 +610,9 @@ export class SumoSystem extends createSystem({}) {
     this.gameData.comboCount = 0;
     this.gameData.comboTimer = 0;
     this.gameData.lastComboText = '';
+    this.gameData.hariteCooldown = 0;
+    this.gameData.isUpsetWin = false;
+    this.gameData.zabutonActive = false;
     this.configureOpponent(oppDef);
     this.resetPositions();
     this.clearFall();
@@ -634,6 +652,120 @@ export class SumoSystem extends createSystem({}) {
     this.gameData.tournamentRound = 0;
     this.gameData.tournamentWins = 0;
     this.startMatch();
+  }
+
+  startSurvival() {
+    this.gameData.inSurvival = true;
+    this.gameData.survivalWave = 1;
+    this.gameData.survivalKills = 0;
+    this.gameData.inTournament = false;
+    const idx = Math.min(this.gameData.survivalWave - 1, OPPONENT_POOL.length - 1);
+    this.gameData.currentOpponent = OPPONENT_POOL[idx];
+    this.gameData.matchNumber++;
+    this.gameData.roundTime = 45;
+    this.gameData.matchResult = null;
+    this.gameData.countdownTime = 3;
+    this.gameData.isCountdown = true;
+    this.gameData.tachiai = true;
+    this.gameData.tachiaiTimer = TACHIAI_DURATION;
+    this.gameData.playerStamina = MAX_STAMINA;
+    this.gameData.isTraining = false;
+    this.gameData.slowMo = 1;
+    this.gameData.slowMoTimer = 0;
+    this.gameData.comboCount = 0;
+    this.gameData.comboTimer = 0;
+    this.gameData.lastComboText = '';
+    this.gameData.hariteCooldown = 0;
+    this.gameData.isUpsetWin = false;
+    this.gameData.zabutonActive = false;
+    this.configureOpponent(this.gameData.currentOpponent);
+    // Survival: scale difficulty per wave
+    this.opponentW.speedVal *= (1 + this.gameData.survivalWave * 0.08);
+    this.resetPositions();
+    this.clearFall();
+    this.celebrationActive = false;
+    this.spawnSalt(this.playerW.pos);
+    this.spawnSalt(this.opponentW.pos);
+    this.gameData.state = 'survival';
+  }
+
+  private nextSurvivalWave() {
+    this.gameData.survivalWave++;
+    this.gameData.survivalKills++;
+    // Restore some stamina between waves
+    this.playerW.stamina = Math.min(MAX_STAMINA, this.playerW.stamina + 40);
+    const idx = Math.min((this.gameData.survivalWave - 1) % OPPONENT_POOL.length, OPPONENT_POOL.length - 1);
+    const oppDef = OPPONENT_POOL[idx];
+    this.gameData.currentOpponent = oppDef;
+    this.gameData.roundTime = Math.max(30, 45 - this.gameData.survivalWave * 1.5);
+    this.gameData.matchResult = null;
+    this.gameData.countdownTime = 2;
+    this.gameData.isCountdown = true;
+    this.gameData.tachiai = false;
+    this.gameData.isUpsetWin = false;
+    this.gameData.zabutonActive = false;
+    this.configureOpponent(oppDef);
+    this.opponentW.speedVal *= (1 + this.gameData.survivalWave * 0.08);
+    this.opponentW.weightVal *= (1 + this.gameData.survivalWave * 0.03);
+    this.resetPositions();
+    this.clearFall();
+    this.spawnSalt(this.playerW.pos);
+    this.spawnSalt(this.opponentW.pos);
+  }
+
+  private doHarite(a: Wrestler, t: Wrestler) {
+    const dist = a.pos.distanceTo(t.pos);
+    if (dist < 1.0) {
+      const dir = new Vector3().subVectors(t.pos, a.pos).normalize();
+      t.vel.add(dir.multiplyScalar(HARITE_FORCE / Math.max(0.5, t.weightVal)));
+      t.stagger = HARITE_STUN;
+      t.damageFlash = 1;
+      a.pushAnim = 1;
+      // Golden impact particles
+      this.spawn(new Vector3().lerpVectors(a.pos, t.pos, 0.4).setY(1.0), 0xffdd00, 18);
+      this.spawn(new Vector3().lerpVectors(a.pos, t.pos, 0.6).setY(0.7), 0xffaa00, 10);
+      this.shakeIntensity = 0.18;
+      this.shakeDecay = 4;
+      this.sfx('charge');
+      this.triggerSlowMo();
+      this.triggerCrowdBounce();
+      // Full crowd eruption on harite
+      for (let i = 0; i < this.spectatorHeads.length; i++) {
+        this.spectatorBounce[i] = 2.0 + Math.random() * 0.5;
+      }
+      this.gameData.lastAction = 'harite';
+      this.addCombo('harite');
+    }
+  }
+
+  private spawnZabuton() {
+    this.gameData.zabutonActive = true;
+    this.zabutonTimer = 2.5;
+    const colors = [0xcc2222, 0x2244aa, 0x228822, 0xaa6622, 0x662288, 0xcc8800];
+    for (let i = 0; i < 25; i++) {
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      const m = new Mesh(
+        new BoxGeometry(0.25, 0.05, 0.2),
+        new MeshStandardMaterial({ color: c, roughness: 0.7, transparent: true, opacity: 1 })
+      );
+      // Thrown from spectator area toward the ring
+      const angle = Math.random() * Math.PI * 2;
+      const throwR = RING_RADIUS + 3 + Math.random() * 3;
+      m.position.set(Math.cos(angle) * throwR, 0.6 + Math.random() * 0.5, Math.sin(angle) * throwR);
+      m.rotation.set(Math.random() * 0.5, Math.random() * Math.PI, Math.random() * 0.5);
+      this.scene.add(m);
+      const toCenter = new Vector3(-m.position.x, 0, -m.position.z).normalize();
+      this.zabutonParticles.push({
+        mesh: m,
+        vel: new Vector3(
+          toCenter.x * (2 + Math.random() * 3),
+          2 + Math.random() * 3,
+          toCenter.z * (2 + Math.random() * 3)
+        ),
+        life: 2.0 + Math.random() * 0.5,
+        maxLife: 2.5,
+      });
+    }
   }
 
   private spawnSalt(pos: Vector3) {
@@ -708,7 +840,7 @@ export class SumoSystem extends createSystem({}) {
       }
     }
 
-    const isPlayState = this.gameData.state === 'playing' || this.gameData.state === 'training';
+    const isPlayState = this.gameData.state === 'playing' || this.gameData.state === 'training' || this.gameData.state === 'survival';
 
     if (isPlayState) {
       if (this.gameData.tachiai) {
@@ -788,11 +920,12 @@ export class SumoSystem extends createSystem({}) {
     this.updateGyoji(dt, time);
     this.updateSpectators(dt, time);
     this.updateCelebration(delta);
+    this.updateZabuton(delta);
   }
 
   private updateGyoji(dt: number, time: number) {
     // Gyoji rotates to face the action during matches
-    const isPlayState = this.gameData.state === 'playing' || this.gameData.state === 'training';
+    const isPlayState = this.gameData.state === 'playing' || this.gameData.state === 'training' || this.gameData.state === 'survival';
     if (isPlayState && !this.gameData.isCountdown && !this.gameData.tachiai) {
       const mid = new Vector3().addVectors(this.playerW.pos, this.opponentW.pos).multiplyScalar(0.5);
       const targetAngle = Math.atan2(mid.x - this.gyojiGroup.position.x, mid.z - this.gyojiGroup.position.z);
@@ -934,11 +1067,19 @@ export class SumoSystem extends createSystem({}) {
       this.addCombo('henka');
     }
 
+    // Harite (palm strike) — R key, available at Komusubi rank (5) and above
+    if (kb.getKeyDown('KeyR') && this.gameData.hariteCooldown <= 0 && p.stamina >= HARITE_STAMINA && this.gameData.currentRank >= 5) {
+      this.doHarite(p, this.opponentW);
+      this.gameData.hariteCooldown = 3.0;
+      p.stamina -= HARITE_STAMINA;
+    }
+
     p.pushCooldown = Math.max(0, p.pushCooldown - dt);
     p.grabCooldown = Math.max(0, p.grabCooldown - dt);
     p.dodgeCooldown = Math.max(0, p.dodgeCooldown - dt);
     p.chargeCooldown = Math.max(0, p.chargeCooldown - dt);
     p.henkaCooldown = Math.max(0, p.henkaCooldown - dt);
+    this.gameData.hariteCooldown = Math.max(0, this.gameData.hariteCooldown - dt);
     p.pushAnim = Math.max(0, p.pushAnim - dt * 4);
     p.grabAnim = Math.max(0, p.grabAnim - dt * 3);
     p.damageFlash = Math.max(0, p.damageFlash - dt * 3);
@@ -1228,11 +1369,23 @@ export class SumoSystem extends createSystem({}) {
       if (this.gameData.matchWins % 3 === 0 && this.gameData.currentRank < RANKS.length - 1) this.gameData.currentRank++;
       this.gameData.winTechnique = getWinningTechnique(this.gameData.lastAction);
       this.spawnCelebration();
+      // Check for upset win: beating an opponent with much higher weight
+      const opp = this.gameData.currentOpponent;
+      if (opp && opp.weight >= 1.5) {
+        this.gameData.isUpsetWin = true;
+        this.spawnZabuton();
+      }
       if (this.gameData.inTournament) {
         this.gameData.tournamentWins++;
         this.gameData.tournamentRound++;
         if (this.gameData.tournamentRound >= this.gameData.tournamentBracket.length) {
           this.gameData.score += 5000;
+        }
+      }
+      if (this.gameData.inSurvival) {
+        this.gameData.score += this.gameData.survivalWave * 200;
+        if (this.gameData.survivalWave > this.gameData.survivalBestWave) {
+          this.gameData.survivalBestWave = this.gameData.survivalWave;
         }
       }
     } else if (result === 'loss') {
@@ -1241,6 +1394,11 @@ export class SumoSystem extends createSystem({}) {
       this.gameData.winTechnique = '';
       if (this.gameData.inTournament) {
         this.gameData.inTournament = false;
+      }
+      if (this.gameData.inSurvival) {
+        if (this.gameData.survivalWave > this.gameData.survivalBestWave) {
+          this.gameData.survivalBestWave = this.gameData.survivalWave;
+        }
       }
     } else {
       const pd = Math.sqrt(this.playerW.pos.x ** 2 + this.playerW.pos.z ** 2);
@@ -1255,6 +1413,9 @@ export class SumoSystem extends createSystem({}) {
         if (this.gameData.inTournament) {
           this.gameData.tournamentWins++;
           this.gameData.tournamentRound++;
+        }
+        if (this.gameData.inSurvival) {
+          this.gameData.score += this.gameData.survivalWave * 200;
         }
       } else {
         this.gameData.matchResult = 'loss';
@@ -1288,6 +1449,35 @@ export class SumoSystem extends createSystem({}) {
       }
     }
     if (this.celebrationTimer <= 0) this.celebrationActive = false;
+  }
+
+  private updateZabuton(dt: number) {
+    if (this.zabutonParticles.length === 0) return;
+    this.zabutonTimer -= dt;
+    for (let i = this.zabutonParticles.length - 1; i >= 0; i--) {
+      const p = this.zabutonParticles[i];
+      p.vel.y -= 4 * dt;
+      p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
+      p.mesh.rotation.x += dt * 2;
+      p.mesh.rotation.z += dt * 1.5;
+      p.life -= dt;
+      // Bounce off ground
+      if (p.mesh.position.y < 0.05) {
+        p.mesh.position.y = 0.05;
+        p.vel.y = Math.abs(p.vel.y) * 0.3;
+        p.vel.x *= 0.5;
+        p.vel.z *= 0.5;
+      }
+      const t = Math.max(0, p.life / p.maxLife);
+      (p.mesh.material as MeshStandardMaterial).opacity = t;
+      if (p.life <= 0) {
+        this.scene.remove(p.mesh);
+        p.mesh.geometry.dispose();
+        (p.mesh.material as MeshStandardMaterial).dispose();
+        this.zabutonParticles.splice(i, 1);
+      }
+    }
+    if (this.zabutonTimer <= 0) this.gameData.zabutonActive = false;
   }
 
   private updateVisuals(dt: number, time: number) {
@@ -1407,6 +1597,18 @@ export class SumoSystem extends createSystem({}) {
     return `Tournament: ${roundName} (${round}/${total})`;
   }
   isTournamentChampion(): boolean { return this.gameData.inTournament && this.gameData.tournamentRound >= this.gameData.tournamentBracket.length; }
+  isSurvival(): boolean { return this.gameData.inSurvival; }
+  getSurvivalWave(): number { return this.gameData.survivalWave; }
+  getSurvivalKills(): number { return this.gameData.survivalKills; }
+  getSurvivalBestWave(): number { return this.gameData.survivalBestWave; }
+  isHariteAvailable(): boolean { return this.gameData.currentRank >= 5; }
+  getHariteCD(): number { return this.gameData.hariteCooldown; }
+  isUpsetWin(): boolean { return this.gameData.isUpsetWin; }
+  continueAfterSurvivalWin() {
+    if (this.gameData.inSurvival && this.gameData.matchResult === 'win') {
+      this.nextSurvivalWave();
+    }
+  }
   setDifficulty(d: number) { this.gameData.difficulty = d; }
   setColorScheme(c: number) { this.gameData.colorScheme = c; }
   setSfx(on: boolean) { this.gameData.sfxOn = on; }
