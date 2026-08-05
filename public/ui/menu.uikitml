@@ -3,7 +3,7 @@
     flex-direction: column;
     align-items: center;
     padding: 30;
-    gap: 16;
+    gap: 14;
     background-color: rgba(10, 0, 0, 0.94);
     border-radius: 16;
     border-width: 2;
@@ -46,6 +46,20 @@
     font-size: 18;
     color: #ff9966;
   }
+  .btn-training {
+    padding: 12;
+    background-color: rgba(40, 120, 40, 0.25);
+    border-radius: 8;
+    width: 280;
+    align-items: center;
+    cursor: pointer;
+    border-width: 1;
+    border-color: rgba(80, 200, 80, 0.4);
+  }
+  .btn-training-text {
+    font-size: 18;
+    color: #88dd88;
+  }
   .controls {
     font-size: 10;
     color: rgba(200, 180, 140, 0.6);
@@ -62,12 +76,15 @@
   <div class="btn-tourney" id="btn-tournament">
     <div class="btn-tourney-text">TOURNAMENT</div>
   </div>
+  <div class="btn-training" id="btn-training">
+    <div class="btn-training-text">TRAINING</div>
+  </div>
   <div class="btn" id="btn-settings">
     <div class="btn-text">SETTINGS</div>
   </div>
   <div class="btn" id="btn-stats">
     <div class="btn-text">STATS</div>
   </div>
-  <div class="controls">WASD Move | Space Push | E Grab | Shift Dodge | Q Charge</div>
-  <div class="controls">VR: Thumbstick Move | Trigger Push | Grip Grab</div>
+  <div class="controls">WASD Move | Space Push | E Grab | Shift Dodge | Q Charge | F Henka</div>
+  <div class="controls">VR: Thumbstick Move | R-Trigger Push | R-Grip Grab | L-Trigger Dodge | L-Grip Henka</div>
 </Panel>

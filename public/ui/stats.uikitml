@@ -69,6 +69,7 @@
   <div class="stat" id="stat-pushes">Total Pushes: 0</div>
   <div class="stat" id="stat-grabs">Total Grabs: 0</div>
   <div class="stat" id="stat-dodges">Total Dodges: 0</div>
+  <div class="stat" id="stat-henkas">Total Henkas: 0</div>
   <div class="stat" id="stat-ringouts">Ring Outs: 0</div>
   <div class="divider"></div>
   <div class="row">

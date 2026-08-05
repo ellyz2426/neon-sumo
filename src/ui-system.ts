@@ -30,12 +30,17 @@ export class UISystem extends createSystem({}) {
   private wire() {
     this.menuPanel?.getElementById('btn-play')?.addEventListener('click', () => { this.sumo.startMatch(); this.showOnly('hud'); });
     this.menuPanel?.getElementById('btn-tournament')?.addEventListener('click', () => { this.sumo.startTournament(); this.showOnly('hud'); });
+    this.menuPanel?.getElementById('btn-training')?.addEventListener('click', () => { this.sumo.startTraining(); this.showOnly('hud'); });
     this.menuPanel?.getElementById('btn-settings')?.addEventListener('click', () => { this.sumo.setState('settings'); this.showOnly('settings'); });
     this.menuPanel?.getElementById('btn-stats')?.addEventListener('click', () => { this.sumo.setState('stats'); this.updateStats(); this.showOnly('stats'); });
 
     this.hudPanel?.getElementById('btn-pause')?.addEventListener('click', () => { this.sumo.setState('paused'); this.showOnly('pause'); });
 
-    this.pausePanel?.getElementById('btn-resume')?.addEventListener('click', () => { this.sumo.setState('playing'); this.showOnly('hud'); });
+    this.pausePanel?.getElementById('btn-resume')?.addEventListener('click', () => {
+      const d = this.sumo.getGameData();
+      this.sumo.setState(d.isTraining ? 'training' : 'playing');
+      this.showOnly('hud');
+    });
     this.pausePanel?.getElementById('btn-quit')?.addEventListener('click', () => { this.sumo.setState('menu'); this.showOnly('menu'); });
 
     this.resultsPanel?.getElementById('btn-next')?.addEventListener('click', () => {
@@ -44,7 +49,6 @@ export class UISystem extends createSystem({}) {
         this.sumo.startMatch();
         this.showOnly('hud');
       } else if (d.inTournament) {
-        // Tournament over (loss or champion)
         this.sumo.setState('menu');
         this.showOnly('menu');
       } else {
@@ -75,14 +79,17 @@ export class UISystem extends createSystem({}) {
     const kb = this.input.keyboard;
 
     if (kb.getKeyDown('Escape') || kb.getKeyDown('KeyP')) {
-      if (d.state === 'playing') { this.sumo.setState('paused'); this.showOnly('pause'); }
-      else if (d.state === 'paused') { this.sumo.setState('playing'); this.showOnly('hud'); }
+      if (d.state === 'playing' || d.state === 'training') { this.sumo.setState('paused'); this.showOnly('pause'); }
+      else if (d.state === 'paused') {
+        this.sumo.setState(d.isTraining ? 'training' : 'playing');
+        this.showOnly('hud');
+      }
     }
 
     if (d.state !== this.lastState) {
       this.lastState = d.state;
       if (d.state === 'menu') this.showOnly('menu');
-      else if (d.state === 'playing') this.showOnly('hud');
+      else if (d.state === 'playing' || d.state === 'training') this.showOnly('hud');
       else if (d.state === 'paused') this.showOnly('pause');
       else if (d.state === 'results') { this.updateResults(); this.showOnly('results'); }
       else if (d.state === 'settings') { this.updateSettings(); this.showOnly('settings'); }
@@ -90,7 +97,7 @@ export class UISystem extends createSystem({}) {
     }
 
     this.hudTimer += delta;
-    if (d.state === 'playing' && this.hudTimer > 0.1) {
+    if ((d.state === 'playing' || d.state === 'training') && this.hudTimer > 0.1) {
       this.hudTimer = 0;
       this.updateHUD(d);
     }
@@ -104,34 +111,53 @@ export class UISystem extends createSystem({}) {
   private updateHUD(d: ReturnType<SumoSystem['getGameData']>) {
     const h = this.hudPanel;
     if (!h) return;
-    if (d.tachiai) {
+
+    if (d.isTraining) {
       h.getElementById('countdown')?.setProperties({ text: '' });
-      h.getElementById('tachiai-text')?.setProperties({ text: '⚡ TACHIAI ⚡' });
-    } else if (d.isCountdown) {
-      const ct = Math.ceil(d.countdownTime);
-      h.getElementById('countdown')?.setProperties({ text: ct > 0 ? String(ct) : 'FIGHT!' });
       h.getElementById('tachiai-text')?.setProperties({ text: '' });
+      h.getElementById('time')?.setProperties({ text: 'TRAINING' });
+      h.getElementById('opponent-name')?.setProperties({ text: 'PRACTICE DUMMY' });
+      h.getElementById('tourney-info')?.setProperties({ text: 'F = Henka (sidestep)' });
     } else {
-      h.getElementById('countdown')?.setProperties({ text: '' });
-      h.getElementById('tachiai-text')?.setProperties({ text: '' });
+      if (d.tachiai) {
+        h.getElementById('countdown')?.setProperties({ text: '' });
+        h.getElementById('tachiai-text')?.setProperties({ text: '⚡ TACHIAI ⚡' });
+      } else if (d.isCountdown) {
+        const ct = Math.ceil(d.countdownTime);
+        h.getElementById('countdown')?.setProperties({ text: ct > 0 ? String(ct) : 'FIGHT!' });
+        h.getElementById('tachiai-text')?.setProperties({ text: '' });
+      } else {
+        h.getElementById('countdown')?.setProperties({ text: '' });
+        h.getElementById('tachiai-text')?.setProperties({ text: '' });
+      }
+      h.getElementById('time')?.setProperties({ text: `Time: ${Math.ceil(d.roundTime)}s` });
+      h.getElementById('opponent-name')?.setProperties({ text: `VS ${this.sumo.getOpponentName()}` });
+      h.getElementById('tourney-info')?.setProperties({ text: this.sumo.getTournamentInfo() });
     }
+
     h.getElementById('score')?.setProperties({ text: `Score: ${d.score}` });
-    h.getElementById('time')?.setProperties({ text: `Time: ${Math.ceil(d.roundTime)}s` });
     h.getElementById('rank')?.setProperties({ text: `Rank: ${this.sumo.getRankName()}` });
-    h.getElementById('opponent-name')?.setProperties({ text: `VS ${this.sumo.getOpponentName()}` });
-    h.getElementById('match-num')?.setProperties({ text: `Match ${d.matchNumber}` });
+    h.getElementById('match-num')?.setProperties({ text: d.isTraining ? '' : `Match ${d.matchNumber}` });
     h.getElementById('streak')?.setProperties({ text: d.currentStreak > 1 ? `${d.currentStreak} Win Streak!` : '' });
+
+    // Combo text
+    const comboText = this.sumo.getComboText();
+    h.getElementById('combo-text')?.setProperties({ text: comboText });
+
     // Stamina
     const stPct = Math.round(d.playerStamina);
     h.getElementById('stamina-label')?.setProperties({ text: `Stamina: ${stPct}%` });
     h.getElementById('stamina-bar')?.setProperties({ width: `${Math.round(d.playerStamina * 2.8)}` });
-    // Tournament info
-    h.getElementById('tourney-info')?.setProperties({ text: this.sumo.getTournamentInfo() });
-    // Cooldown indicators
+
+    // Slow-mo indicator
+    h.getElementById('slowmo-text')?.setProperties({ text: d.slowMo < 1 ? '● SLOW MOTION ●' : '' });
+
+    // Cooldown indicators (now with henka)
     h.getElementById('push-cd')?.setProperties({ text: d.playerPushCD > 0 ? `Push: ${d.playerPushCD.toFixed(1)}s` : (d.playerStamina < 15 ? 'Push: LOW' : 'Push: READY') });
     h.getElementById('grab-cd')?.setProperties({ text: d.playerGrabCD > 0 ? `Grab: ${d.playerGrabCD.toFixed(1)}s` : (d.playerStamina < 25 ? 'Grab: LOW' : 'Grab: READY') });
     h.getElementById('dodge-cd')?.setProperties({ text: d.playerDodgeCD > 0 ? `Dodge: ${d.playerDodgeCD.toFixed(1)}s` : (d.playerStamina < 20 ? 'Dodge: LOW' : 'Dodge: READY') });
     h.getElementById('charge-cd')?.setProperties({ text: d.playerChargeCD > 0 ? `Charge: ${d.playerChargeCD.toFixed(1)}s` : (d.playerStamina < 30 ? 'Charge: LOW' : 'Charge: READY') });
+    h.getElementById('henka-cd')?.setProperties({ text: d.playerHenkaCD > 0 ? `Henka: ${d.playerHenkaCD.toFixed(1)}s` : (d.playerStamina < 18 ? 'Henka: LOW' : 'Henka: READY') });
   }
 
   private updateResults() {
@@ -151,7 +177,9 @@ export class UISystem extends createSystem({}) {
     r.getElementById('result-record')?.setProperties({ text: `Record: ${d.wins}W - ${d.losses}L` });
     r.getElementById('result-streak')?.setProperties({ text: `Win Streak: ${d.currentStreak}` });
     r.getElementById('result-opponent')?.setProperties({ text: `Opponent: ${this.sumo.getOpponentName()}` });
-    // Tournament info
+    // Combo bonus display
+    const comboBonus = d.comboCount >= 2 ? `Combo Bonus: +${d.comboCount * 100}` : '';
+    r.getElementById('result-combo')?.setProperties({ text: comboBonus });
     if (this.sumo.isTournamentChampion()) {
       r.getElementById('tourney-result')?.setProperties({ text: `Tournament complete! ${d.tournamentWins} wins` });
       r.getElementById('champion-text')?.setProperties({ text: '🏆 CHAMPION 🏆' });
@@ -188,6 +216,7 @@ export class UISystem extends createSystem({}) {
     sp.getElementById('stat-pushes')?.setProperties({ text: `Total Pushes: ${d.totalPushes}` });
     sp.getElementById('stat-grabs')?.setProperties({ text: `Total Grabs: ${d.totalGrabs}` });
     sp.getElementById('stat-dodges')?.setProperties({ text: `Total Dodges: ${d.totalDodges}` });
+    sp.getElementById('stat-henkas')?.setProperties({ text: `Total Henkas: ${d.totalHenkas}` });
     sp.getElementById('stat-ringouts')?.setProperties({ text: `Ring Outs: ${d.totalRingOuts}` });
     sp.getElementById('stat-streak')?.setProperties({ text: `Best Streak: ${d.bestWinStreak}` });
     sp.getElementById('stat-score')?.setProperties({ text: `Total Score: ${d.score}` });

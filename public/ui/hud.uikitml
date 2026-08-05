@@ -5,12 +5,12 @@
     gap: 4;
     background-color: rgba(0, 0, 0, 0.7);
     border-radius: 8;
-    width: 300;
+    width: 320;
   }
   .row {
     flex-direction: row;
     justify-content: space-between;
-    width: 280;
+    width: 300;
     align-items: center;
   }
   .score {
@@ -47,6 +47,16 @@
     color: #ffcc44;
     align-items: center;
   }
+  .combo-text {
+    font-size: 18;
+    color: #ff44ff;
+    align-items: center;
+  }
+  .slowmo-text {
+    font-size: 12;
+    color: #44ffff;
+    align-items: center;
+  }
   .pause-btn {
     padding: 4;
     background-color: rgba(255, 255, 255, 0.15);
@@ -62,7 +72,7 @@
   .cd-row {
     flex-direction: row;
     justify-content: space-between;
-    width: 280;
+    width: 300;
     align-items: center;
   }
   .cd-text {
@@ -71,11 +81,11 @@
   }
   .divider {
     height: 1;
-    width: 280;
+    width: 300;
     background-color: rgba(255, 170, 50, 0.2);
   }
   .stamina-outer {
-    width: 280;
+    width: 300;
     height: 10;
     background-color: rgba(50, 50, 50, 0.8);
     border-radius: 4;
@@ -98,6 +108,8 @@
 <Panel class="root">
   <div class="countdown" id="countdown"></div>
   <div class="tachiai-text" id="tachiai-text"></div>
+  <div class="combo-text" id="combo-text"></div>
+  <div class="slowmo-text" id="slowmo-text"></div>
   <div class="row">
     <div class="score" id="score">Score: 0</div>
     <div class="time" id="time">Time: 60s</div>
@@ -121,10 +133,12 @@
   <div class="cd-row">
     <div class="cd-text" id="push-cd">Push: READY</div>
     <div class="cd-text" id="grab-cd">Grab: READY</div>
+    <div class="cd-text" id="henka-cd">Henka: READY</div>
   </div>
   <div class="cd-row">
     <div class="cd-text" id="dodge-cd">Dodge: READY</div>
     <div class="cd-text" id="charge-cd">Charge: READY</div>
+    <div class="cd-text"></div>
   </div>
   <div class="cd-row">
     <div class="cd-text"></div>
