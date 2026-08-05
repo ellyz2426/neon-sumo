@@ -102,13 +102,25 @@ export class UISystem extends createSystem({}) {
     h.getElementById('opponent-name')?.setProperties({ text: `VS ${this.sumo.getOpponentName()}` });
     h.getElementById('match-num')?.setProperties({ text: `Match ${d.matchNumber}` });
     h.getElementById('streak')?.setProperties({ text: d.currentStreak > 1 ? `${d.currentStreak} Win Streak!` : '' });
+    // Cooldown indicators
+    h.getElementById('push-cd')?.setProperties({ text: d.playerPushCD > 0 ? `Push: ${d.playerPushCD.toFixed(1)}s` : 'Push: READY' });
+    h.getElementById('grab-cd')?.setProperties({ text: d.playerGrabCD > 0 ? `Grab: ${d.playerGrabCD.toFixed(1)}s` : 'Grab: READY' });
+    h.getElementById('dodge-cd')?.setProperties({ text: d.playerDodgeCD > 0 ? `Dodge: ${d.playerDodgeCD.toFixed(1)}s` : 'Dodge: READY' });
+    h.getElementById('charge-cd')?.setProperties({ text: d.playerChargeCD > 0 ? `Charge: ${d.playerChargeCD.toFixed(1)}s` : 'Charge: READY' });
   }
 
   private updateResults() {
     const r = this.resultsPanel;
     if (!r) return;
     const d = this.sumo.getGameData();
-    r.getElementById('result-title')?.setProperties({ text: d.matchResult === 'win' ? 'VICTORY!' : d.matchResult === 'loss' ? 'DEFEAT!' : 'TIME OUT' });
+    const technique = this.sumo.getWinTechnique();
+    if (d.matchResult === 'win') {
+      r.getElementById('result-title')?.setProperties({ text: 'VICTORY!' });
+      r.getElementById('result-technique')?.setProperties({ text: technique ? `Kimarite: ${technique}` : '' });
+    } else {
+      r.getElementById('result-title')?.setProperties({ text: d.matchResult === 'loss' ? 'DEFEAT!' : 'TIME OUT' });
+      r.getElementById('result-technique')?.setProperties({ text: '' });
+    }
     r.getElementById('result-score')?.setProperties({ text: `Score: ${d.score}` });
     r.getElementById('result-rank')?.setProperties({ text: `Rank: ${this.sumo.getRankName()}` });
     r.getElementById('result-record')?.setProperties({ text: `Record: ${d.wins}W - ${d.losses}L` });

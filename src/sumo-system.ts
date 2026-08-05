@@ -104,13 +104,19 @@ export interface GameData {
   matchResult: 'win' | 'loss' | 'timeout' | null;
   countdownTime: number;
   isCountdown: boolean;
+  lastAction: string;
+  winTechnique: string;
+  playerPushCD: number;
+  playerGrabCD: number;
+  playerDodgeCD: number;
+  playerChargeCD: number;
 }
 
 const COLOR_SCHEMES = [
-  { name: 'Dohyo Classic', accent: 0xffdd66 },
-  { name: 'Neon Arena', accent: 0x00ccff },
-  { name: 'Cherry Blossom', accent: 0xff99cc },
-  { name: 'Thunder', accent: 0xffcc44 },
+  { name: 'Dohyo Classic', accent: 0xffdd66, ring: 0xcc9944, platform: 0x886633, pillar: 0xcc2222, lantern: 0xff6600, ambient: 0x404060, ground: 0x1a1a2e, rope: 0xffcc00 },
+  { name: 'Neon Arena', accent: 0x00ccff, ring: 0x224466, platform: 0x112244, pillar: 0x0066cc, lantern: 0x00aaff, ambient: 0x101040, ground: 0x080820, rope: 0x00ddff },
+  { name: 'Cherry Blossom', accent: 0xff99cc, ring: 0xccaa88, platform: 0x997755, pillar: 0xcc6688, lantern: 0xff88aa, ambient: 0x503050, ground: 0x1a1020, rope: 0xffaacc },
+  { name: 'Thunder', accent: 0xffcc44, ring: 0x665522, platform: 0x443311, pillar: 0x886600, lantern: 0xffaa00, ambient: 0x302010, ground: 0x151008, rope: 0xffdd00 },
 ];
 
 const RING_RADIUS = 3.5;
@@ -120,6 +126,19 @@ const DODGE_SPEED = 8.0;
 const DODGE_DURATION = 0.25;
 const FRICTION = 4.0;
 const MATCH_TIME = 60;
+
+const WINNING_TECHNIQUES = [
+  'Oshidashi', 'Yorikiri', 'Hatakikomi', 'Uwatenage',
+  'Okuridashi', 'Tsukiotoshi', 'Kotenage', 'Sukuinage',
+  'Shitatenage', 'Oshitaoshi', 'Hikiotoshi', 'Tsukidashi',
+];
+
+function getWinningTechnique(lastAction: string): string {
+  if (lastAction === 'push') return WINNING_TECHNIQUES[Math.random() < 0.5 ? 0 : 11];
+  if (lastAction === 'grab') return WINNING_TECHNIQUES[Math.random() < 0.5 ? 1 : 3];
+  if (lastAction === 'charge') return WINNING_TECHNIQUES[Math.random() < 0.5 ? 5 : 9];
+  return WINNING_TECHNIQUES[Math.floor(Math.random() * WINNING_TECHNIQUES.length)];
+}
 
 export class SumoSystem extends createSystem({}) {
   private playerW!: Wrestler;
@@ -136,6 +155,18 @@ export class SumoSystem extends createSystem({}) {
   private fallGroup: Group | null = null;
   private fallAnim = 0;
   audioSystemRef: { playSFX: (t: string) => void } | null = null;
+  private groundMesh!: Mesh;
+  private platformMesh!: Mesh;
+  private ringSurface!: Mesh;
+  private pillarMeshes: Mesh[] = [];
+  private lanternMeshes: Mesh[] = [];
+  private ropeMeshes: Mesh[] = [];
+  private wallMeshes: Mesh[] = [];
+  private ceilingGroup!: Group;
+  private footstepTimer = 0;
+  private crowdExcitement = 0;
+  private lastScheme = 0;
+  private ambientLight!: AmbientLight;
 
   init() {
     this.gameData = {
@@ -144,6 +175,7 @@ export class SumoSystem extends createSystem({}) {
       bestWinStreak: 0, currentStreak: 0, currentOpponent: null, matchNumber: 0,
       roundTime: MATCH_TIME, difficulty: 1, colorScheme: 0,
       sfxOn: true, musicOn: true, matchResult: null, countdownTime: 3, isCountdown: false,
+      lastAction: '', winTechnique: '', playerPushCD: 0, playerGrabCD: 0, playerDodgeCD: 0, playerChargeCD: 0,
     };
     this.loadStats();
     this.buildArena();
@@ -183,26 +215,27 @@ export class SumoSystem extends createSystem({}) {
   private buildArena() {
     this.arenaGroup = new Group();
     this.scene.add(this.arenaGroup);
-    this.scene.add(new AmbientLight(0x404060, 0.6));
+    this.ambientLight = new AmbientLight(0x404060, 0.6);
+    this.scene.add(this.ambientLight);
     const dl = new DirectionalLight(0xffffff, 0.8);
     dl.position.set(5, 10, 5);
     this.scene.add(dl);
 
     // Ground
-    const ground = new Mesh(new PlaneGeometry(30, 30), new MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.9 }));
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.05;
-    this.arenaGroup.add(ground);
+    this.groundMesh = new Mesh(new PlaneGeometry(30, 30), new MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.9 }));
+    this.groundMesh.rotation.x = -Math.PI / 2;
+    this.groundMesh.position.y = -0.05;
+    this.arenaGroup.add(this.groundMesh);
 
     // Platform
-    const platform = new Mesh(new CylinderGeometry(RING_RADIUS + 0.8, RING_RADIUS + 1.2, 0.4, 48), new MeshStandardMaterial({ color: 0x886633, roughness: 0.7 }));
-    platform.position.y = 0.15;
-    this.arenaGroup.add(platform);
+    this.platformMesh = new Mesh(new CylinderGeometry(RING_RADIUS + 0.8, RING_RADIUS + 1.2, 0.4, 48), new MeshStandardMaterial({ color: 0x886633, roughness: 0.7 }));
+    this.platformMesh.position.y = 0.15;
+    this.arenaGroup.add(this.platformMesh);
 
     // Ring surface
-    const ringSurface = new Mesh(new CylinderGeometry(RING_RADIUS + 0.3, RING_RADIUS + 0.3, 0.05, 48), new MeshStandardMaterial({ color: 0xcc9944, roughness: 0.5 }));
-    ringSurface.position.y = 0.36;
-    this.arenaGroup.add(ringSurface);
+    this.ringSurface = new Mesh(new CylinderGeometry(RING_RADIUS + 0.3, RING_RADIUS + 0.3, 0.05, 48), new MeshStandardMaterial({ color: 0xcc9944, roughness: 0.5 }));
+    this.ringSurface.position.y = 0.36;
+    this.arenaGroup.add(this.ringSurface);
 
     // Ring boundary
     this.ringEdgeGlow = new Mesh(new TorusGeometry(RING_RADIUS, 0.08, 8, 64), new MeshStandardMaterial({ color: 0xffdd66, emissive: 0xffdd66, emissiveIntensity: 0.5 }));
@@ -210,16 +243,33 @@ export class SumoSystem extends createSystem({}) {
     this.ringEdgeGlow.position.y = 0.4;
     this.arenaGroup.add(this.ringEdgeGlow);
 
+    // Center salt circle marking
+    const centerMark = new Mesh(new TorusGeometry(0.5, 0.03, 6, 32), new MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.2, transparent: true, opacity: 0.4 }));
+    centerMark.rotation.x = -Math.PI / 2;
+    centerMark.position.y = 0.37;
+    this.arenaGroup.add(centerMark);
+
+    // Starting lines (shikiri-sen)
+    for (const z of [-0.6, 0.6]) {
+      const line = new Mesh(new BoxGeometry(0.6, 0.02, 0.06), new MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.15, transparent: true, opacity: 0.5 }));
+      line.position.set(0, 0.37, z);
+      this.arenaGroup.add(line);
+    }
+
     // 4 corner pillars + lanterns
+    this.pillarMeshes = [];
+    this.lanternMeshes = [];
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
       const px = Math.cos(a) * (RING_RADIUS + 1.5), pz = Math.sin(a) * (RING_RADIUS + 1.5);
       const pillar = new Mesh(new CylinderGeometry(0.12, 0.15, 2.5, 8), new MeshStandardMaterial({ color: 0xcc2222, emissive: 0xcc2222, emissiveIntensity: 0.3 }));
       pillar.position.set(px, 1.25, pz);
       this.arenaGroup.add(pillar);
+      this.pillarMeshes.push(pillar);
       const lantern = new Mesh(new BoxGeometry(0.3, 0.4, 0.3), new MeshStandardMaterial({ color: 0xff6600, emissive: 0xff6600, emissiveIntensity: 0.6 }));
       lantern.position.set(px, 2.6, pz);
       this.arenaGroup.add(lantern);
+      this.lanternMeshes.push(lantern);
       const lt = new PointLight(0xff8844, 1.0, 8);
       lt.position.set(px, 2.8, pz);
       this.arenaGroup.add(lt);
@@ -227,6 +277,7 @@ export class SumoSystem extends createSystem({}) {
     }
 
     // Ropes between pillars
+    this.ropeMeshes = [];
     for (let i = 0; i < 4; i++) {
       const a1 = (i / 4) * Math.PI * 2 + Math.PI / 4;
       const a2 = ((i + 1) / 4) * Math.PI * 2 + Math.PI / 4;
@@ -239,6 +290,47 @@ export class SumoSystem extends createSystem({}) {
       rope.lookAt(x2, 2.5, z2);
       rope.rotateZ(Math.PI / 2);
       this.arenaGroup.add(rope);
+      this.ropeMeshes.push(rope);
+    }
+
+    // Dojo walls
+    this.wallMeshes = [];
+    const wallR = 12;
+    const wallSegs = 16;
+    for (let i = 0; i < wallSegs; i++) {
+      const a = (i / wallSegs) * Math.PI * 2;
+      const wx = Math.cos(a) * wallR, wz = Math.sin(a) * wallR;
+      const wall = new Mesh(new BoxGeometry(4.8, 5, 0.2), new MeshStandardMaterial({ color: 0x2a1a0a, roughness: 0.9 }));
+      wall.position.set(wx, 2.5, wz);
+      wall.lookAt(0, 2.5, 0);
+      this.arenaGroup.add(wall);
+      this.wallMeshes.push(wall);
+    }
+
+    // Roof beams
+    this.ceilingGroup = new Group();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const beam = new Mesh(new BoxGeometry(0.15, 0.1, wallR * 0.9), new MeshStandardMaterial({ color: 0x3a2010, roughness: 0.8 }));
+      beam.position.set(0, 5.2, 0);
+      beam.rotation.y = a;
+      this.ceilingGroup.add(beam);
+    }
+    // Ceiling disc
+    const ceil = new Mesh(new CylinderGeometry(wallR * 0.95, wallR * 0.95, 0.1, 32), new MeshStandardMaterial({ color: 0x1a0e05, roughness: 0.9 }));
+    ceil.position.y = 5.3;
+    this.ceilingGroup.add(ceil);
+    this.arenaGroup.add(this.ceilingGroup);
+
+    // Decorative banners on walls
+    const bannerColors = [0xcc0000, 0x0044aa, 0xcc8800, 0x006633];
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      const bx = Math.cos(a) * (wallR - 0.3), bz = Math.sin(a) * (wallR - 0.3);
+      const banner = new Mesh(new PlaneGeometry(1.2, 2.5), new MeshStandardMaterial({ color: bannerColors[i], emissive: bannerColors[i], emissiveIntensity: 0.1, side: 2 }));
+      banner.position.set(bx, 3, bz);
+      banner.lookAt(0, 3, 0);
+      this.arenaGroup.add(banner);
     }
 
     // Spectators
@@ -395,7 +487,14 @@ export class SumoSystem extends createSystem({}) {
         this.checkRingOut();
         this.gameData.roundTime -= dt;
         if (this.gameData.roundTime <= 0) this.endMatch('timeout');
+        this.updateFootsteps(dt);
+        this.updateCrowdExcitement(dt);
       }
+      // Expose cooldowns to HUD
+      this.gameData.playerPushCD = this.playerW.pushCooldown;
+      this.gameData.playerGrabCD = this.playerW.grabCooldown;
+      this.gameData.playerDodgeCD = this.playerW.dodgeCooldown;
+      this.gameData.playerChargeCD = this.playerW.chargeCooldown;
     }
     if (this.fallGroup) {
       this.fallAnim += dt;
@@ -407,6 +506,25 @@ export class SumoSystem extends createSystem({}) {
     this.updateVisuals(dt, time);
     this.updateParticles(dt);
     this.updateCam(dt);
+  }
+
+  private updateFootsteps(dt: number) {
+    this.footstepTimer += dt;
+    if (this.footstepTimer < 0.15) return;
+    this.footstepTimer = 0;
+    for (const w of [this.playerW, this.opponentW]) {
+      if (w.vel.length() > 0.5) {
+        this.spawn(w.pos.clone().setY(0.4), 0xccaa77, 2);
+      }
+    }
+  }
+
+  private updateCrowdExcitement(dt: number) {
+    const pd = Math.sqrt(this.playerW.pos.x ** 2 + this.playerW.pos.z ** 2);
+    const od = Math.sqrt(this.opponentW.pos.x ** 2 + this.opponentW.pos.z ** 2);
+    const edgeFactor = Math.max(pd / RING_RADIUS, od / RING_RADIUS);
+    const targetExcitement = Math.min(1, edgeFactor * 1.2);
+    this.crowdExcitement += (targetExcitement - this.crowdExcitement) * dt * 3;
   }
 
   private updatePlayerInput(dt: number) {
@@ -441,6 +559,7 @@ export class SumoSystem extends createSystem({}) {
       this.doPush(p, this.opponentW);
       p.pushCooldown = 0.5;
       this.gameData.totalPushes++;
+      this.gameData.lastAction = 'push';
     }
 
     // Grab
@@ -449,6 +568,7 @@ export class SumoSystem extends createSystem({}) {
       this.doGrab(p, this.opponentW);
       p.grabCooldown = 1.5;
       this.gameData.totalGrabs++;
+      this.gameData.lastAction = 'grab';
     }
 
     // Dodge
@@ -464,7 +584,7 @@ export class SumoSystem extends createSystem({}) {
       p.isCharging = true;
       p.chargeTime += dt;
     } else if (p.isCharging) {
-      if (p.chargeTime > 0.3) this.doCharge(p, this.opponentW);
+      if (p.chargeTime > 0.3) { this.doCharge(p, this.opponentW); this.gameData.lastAction = 'charge'; }
       p.isCharging = false;
       p.chargeTime = 0;
       p.chargeCooldown = 2.0;
@@ -679,14 +799,16 @@ export class SumoSystem extends createSystem({}) {
       if (this.gameData.currentStreak > this.gameData.bestWinStreak) this.gameData.bestWinStreak = this.gameData.currentStreak;
       this.gameData.score += 500 + Math.floor(this.gameData.roundTime * 10) + (this.gameData.currentRank + 1) * 100;
       if (this.gameData.matchWins % 3 === 0 && this.gameData.currentRank < RANKS.length - 1) this.gameData.currentRank++;
+      this.gameData.winTechnique = getWinningTechnique(this.gameData.lastAction);
     } else if (result === 'loss') {
       this.gameData.losses++;
       this.gameData.currentStreak = 0;
+      this.gameData.winTechnique = '';
     } else {
       const pd = Math.sqrt(this.playerW.pos.x ** 2 + this.playerW.pos.z ** 2);
       const od = Math.sqrt(this.opponentW.pos.x ** 2 + this.opponentW.pos.z ** 2);
-      if (pd < od) { this.gameData.matchResult = 'win'; this.gameData.wins++; this.gameData.matchWins++; this.gameData.score += 300; }
-      else { this.gameData.matchResult = 'loss'; this.gameData.losses++; this.gameData.currentStreak = 0; }
+      if (pd < od) { this.gameData.matchResult = 'win'; this.gameData.wins++; this.gameData.matchWins++; this.gameData.score += 300; this.gameData.winTechnique = 'Yorikiri'; }
+      else { this.gameData.matchResult = 'loss'; this.gameData.losses++; this.gameData.currentStreak = 0; this.gameData.winTechnique = ''; }
     }
     this.saveStats();
     this.gameData.state = 'results';
@@ -710,11 +832,27 @@ export class SumoSystem extends createSystem({}) {
       }
       w.body.position.y = 0.5 * w.heightScale + 0.4 + Math.sin(time * 3 + (w.isPlayerW ? 0 : 1)) * 0.02;
     }
+
+    // Apply full color scheme
+    const scheme = COLOR_SCHEMES[this.gameData.colorScheme];
+    if (this.gameData.colorScheme !== this.lastScheme) {
+      this.lastScheme = this.gameData.colorScheme;
+      (this.groundMesh.material as MeshStandardMaterial).color.set(scheme.ground);
+      (this.platformMesh.material as MeshStandardMaterial).color.set(scheme.platform);
+      (this.ringSurface.material as MeshStandardMaterial).color.set(scheme.ring);
+      this.ambientLight.color.set(scheme.ambient);
+      for (const p of this.pillarMeshes) { (p.material as MeshStandardMaterial).color.set(scheme.pillar); (p.material as MeshStandardMaterial).emissive.set(scheme.pillar); }
+      for (const l of this.lanternMeshes) { (l.material as MeshStandardMaterial).color.set(scheme.lantern); (l.material as MeshStandardMaterial).emissive.set(scheme.lantern); }
+      for (const r of this.ropeMeshes) { (r.material as MeshStandardMaterial).color.set(scheme.rope); (r.material as MeshStandardMaterial).emissive.set(scheme.rope); }
+    }
+
     const em = this.ringEdgeGlow.material as MeshStandardMaterial;
     em.emissiveIntensity = 0.3 + Math.sin(time * 2) * 0.15;
-    const scheme = COLOR_SCHEMES[this.gameData.colorScheme];
     em.color.set(scheme.accent); em.emissive.set(scheme.accent);
-    for (const l of this.crowdLights) l.intensity = 0.8 + Math.sin(time * 5 + l.position.x) * 0.2;
+
+    // Crowd excitement affects lantern flicker intensity
+    const exciteMult = 1 + this.crowdExcitement * 1.5;
+    for (const l of this.crowdLights) l.intensity = (0.8 + Math.sin(time * 5 + l.position.x) * 0.2) * exciteMult;
     for (const d of this.dustParticles) { d.position.y = 0.4 + Math.sin(time * 1.5 + d.position.x * 3) * 0.15; d.position.x += Math.sin(time * 0.5 + d.position.z) * dt * 0.1; }
   }
 
@@ -742,7 +880,11 @@ export class SumoSystem extends createSystem({}) {
 
   private updateCam(dt: number) {
     const c = this.camera;
-    c.position.lerp(new Vector3(0, 6, 7), dt * 2);
+    // Dynamic camera zoom based on wrestler distance
+    const dist = this.playerW.pos.distanceTo(this.opponentW.pos);
+    const targetY = dist < 1.5 ? 4.5 : 6;
+    const targetZ = dist < 1.5 ? 5.5 : 7;
+    c.position.lerp(new Vector3(0, targetY, targetZ), dt * 2);
     if (this.shakeIntensity > 0) {
       this.cameraOffset.set((Math.random() - 0.5) * this.shakeIntensity, (Math.random() - 0.5) * this.shakeIntensity, (Math.random() - 0.5) * this.shakeIntensity);
       c.position.add(this.cameraOffset);
@@ -755,6 +897,7 @@ export class SumoSystem extends createSystem({}) {
   getGameData(): GameData { return this.gameData; }
   getRankName(): string { return RANKS[Math.min(this.gameData.currentRank, RANKS.length - 1)]; }
   getOpponentName(): string { return this.gameData.currentOpponent?.name ?? 'UNKNOWN'; }
+  getWinTechnique(): string { return this.gameData.winTechnique; }
   setDifficulty(d: number) { this.gameData.difficulty = d; }
   setColorScheme(c: number) { this.gameData.colorScheme = c; }
   setSfx(on: boolean) { this.gameData.sfxOn = on; }

@@ -5,12 +5,12 @@
     gap: 4;
     background-color: rgba(0, 0, 0, 0.7);
     border-radius: 8;
-    width: 280;
+    width: 300;
   }
   .row {
     flex-direction: row;
     justify-content: space-between;
-    width: 260;
+    width: 280;
     align-items: center;
   }
   .score {
@@ -54,9 +54,20 @@
     font-size: 10;
     color: rgba(255, 255, 255, 0.7);
   }
+  .cd-row {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 280;
+    align-items: center;
+  }
   .cd-text {
-    font-size: 12;
+    font-size: 10;
     color: rgba(180, 180, 180, 0.7);
+  }
+  .divider {
+    height: 1;
+    width: 280;
+    background-color: rgba(255, 170, 50, 0.2);
   }
 </style>
 <Panel class="root">
@@ -73,8 +84,17 @@
     <div class="opponent" id="opponent-name">VS TARO</div>
     <div class="streak" id="streak"></div>
   </div>
-  <div class="row">
+  <div class="divider"></div>
+  <div class="cd-row">
     <div class="cd-text" id="push-cd">Push: READY</div>
+    <div class="cd-text" id="grab-cd">Grab: READY</div>
+  </div>
+  <div class="cd-row">
+    <div class="cd-text" id="dodge-cd">Dodge: READY</div>
+    <div class="cd-text" id="charge-cd">Charge: READY</div>
+  </div>
+  <div class="cd-row">
+    <div class="cd-text"></div>
     <div class="pause-btn" id="btn-pause">
       <div class="pause-text">PAUSE</div>
     </div>
