@@ -61,6 +61,16 @@
     flex-direction: row;
     gap: 16;
   }
+  .section-title {
+    font-size: 16;
+    color: #ffaa44;
+    width: 320;
+  }
+  .history-entry {
+    font-size: 12;
+    color: rgba(180, 170, 140, 0.8);
+    width: 320;
+  }
 </style>
 <Panel class="root">
   <div class="title">CAREER STATS</div>
@@ -78,6 +88,13 @@
   <div class="stat" id="stat-dodges">Total Dodges: 0</div>
   <div class="stat" id="stat-henkas">Total Henkas: 0</div>
   <div class="stat" id="stat-ringouts">Ring Outs: 0</div>
+  <div class="divider"></div>
+  <div class="section-title">Recent Matches</div>
+  <div class="history-entry" id="history-0"></div>
+  <div class="history-entry" id="history-1"></div>
+  <div class="history-entry" id="history-2"></div>
+  <div class="history-entry" id="history-3"></div>
+  <div class="history-entry" id="history-4"></div>
   <div class="divider"></div>
   <div class="row">
     <div class="btn" id="btn-back">

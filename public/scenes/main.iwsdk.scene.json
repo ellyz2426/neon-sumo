@@ -9,7 +9,8 @@
       "pause-panel",
       "results-panel",
       "settings-panel",
-      "stats-panel"
+      "stats-panel",
+      "scout-panel"
     ]
   },
   "nodes": [
@@ -53,6 +54,13 @@
       "name": "Stats Panel",
       "content": { "type": "asset", "asset": "stats-panel" },
       "transform": { "position": [0, 2.0, -3], "scale": 0.45 },
+      "components": { "RayInteractable": {} }
+    },
+    {
+      "id": "scout-panel",
+      "name": "Scout Panel",
+      "content": { "type": "asset", "asset": "scout-panel" },
+      "transform": { "position": [0, 2.0, -3], "scale": 0.5 },
       "components": { "RayInteractable": {} }
     }
   ]

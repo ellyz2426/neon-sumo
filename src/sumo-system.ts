@@ -19,7 +19,7 @@ import {
   ConeGeometry,
 } from 'three';
 
-export type GameState = 'menu' | 'playing' | 'paused' | 'results' | 'settings' | 'stats' | 'training' | 'survival';
+export type GameState = 'menu' | 'playing' | 'paused' | 'results' | 'settings' | 'stats' | 'training' | 'survival' | 'scouting';
 
 const RANKS = ['Jonokuchi', 'Jonidan', 'Sandanme', 'Makushita', 'Juryo', 'Maegashira', 'Komusubi', 'Sekiwake', 'Ozeki', 'Yokozuna'];
 
@@ -137,6 +137,12 @@ export interface GameData {
   hariteCooldown: number;
   isUpsetWin: boolean;
   zabutonActive: boolean;
+  rankUpPending: boolean;
+  rankUpFrom: number;
+  rankUpTo: number;
+  rankUpTimer: number;
+  matchHistory: { opponent: string; result: string; technique: string; score: number }[];
+  chargeDisplayPower: number;
 }
 
 const COLOR_SCHEMES = [
@@ -221,6 +227,13 @@ export class SumoSystem extends createSystem({}) {
   private celebrationParticles: Particle[] = [];
   private zabutonParticles: Particle[] = [];
   private zabutonTimer = 0;
+  private chargeMeterGroup!: Group;
+  private chargeMeterBar!: Mesh;
+  private chargeMeterBg!: Mesh;
+  private rankUpParticles: Particle[] = [];
+  private rankUpActive = false;
+  private rankUpEffectTimer = 0;
+  private sandSprayTimer = 0;
 
   init() {
     this.gameData = {
@@ -237,10 +250,13 @@ export class SumoSystem extends createSystem({}) {
       comboCount: 0, comboTimer: 0, lastComboText: '',
       inSurvival: false, survivalWave: 0, survivalKills: 0, survivalBestWave: 0,
       hariteCooldown: 0, isUpsetWin: false, zabutonActive: false,
+      rankUpPending: false, rankUpFrom: 0, rankUpTo: 0, rankUpTimer: 0,
+      matchHistory: [], chargeDisplayPower: 0,
     };
     this.loadStats();
     this.buildArena();
     this.buildGyoji();
+    this.buildChargeMeter();
     this.playerW = this.createWrestler(true, 0x00aaff, 1.0, 1.0);
     this.opponentW = this.createWrestler(false, 0xff4422, 1.0, 1.0);
     this.resetPositions();
@@ -483,6 +499,97 @@ export class SumoSystem extends createSystem({}) {
     // Position gyoji to the side of the ring
     this.gyojiGroup.position.set(RING_RADIUS + 0.5, 0.0, 0);
     this.scene.add(this.gyojiGroup);
+  }
+
+  private buildChargeMeter() {
+    this.chargeMeterGroup = new Group();
+    // Background bar
+    this.chargeMeterBg = new Mesh(
+      new BoxGeometry(0.6, 0.08, 0.02),
+      new MeshStandardMaterial({ color: 0x222222, transparent: true, opacity: 0.6 })
+    );
+    this.chargeMeterGroup.add(this.chargeMeterBg);
+    // Fill bar
+    this.chargeMeterBar = new Mesh(
+      new BoxGeometry(0.6, 0.06, 0.025),
+      new MeshStandardMaterial({ color: 0xff8800, emissive: 0xff6600, emissiveIntensity: 0.8, transparent: true, opacity: 0.9 })
+    );
+    this.chargeMeterBar.position.z = 0.005;
+    this.chargeMeterGroup.add(this.chargeMeterBar);
+    this.chargeMeterGroup.visible = false;
+    this.scene.add(this.chargeMeterGroup);
+  }
+
+  private spawnSandSpray(pos: Vector3, intensity: number) {
+    const count = Math.floor(4 + intensity * 10);
+    for (let i = 0; i < count; i++) {
+      const m = new Mesh(
+        new SphereGeometry(0.02 + Math.random() * 0.02, 4, 3),
+        new MeshStandardMaterial({ color: 0xccaa66, emissive: 0xaa8844, emissiveIntensity: 0.2, transparent: true, opacity: 0.7 })
+      );
+      m.position.copy(pos).setY(0.38);
+      this.scene.add(m);
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1 + Math.random() * 2 * intensity;
+      this.particles.push({
+        mesh: m,
+        vel: new Vector3(Math.cos(angle) * speed, Math.random() * 1.5 + 0.5, Math.sin(angle) * speed),
+        life: 0.4 + Math.random() * 0.3,
+        maxLife: 0.6,
+      });
+    }
+  }
+
+  private triggerRankUpEffect() {
+    this.rankUpActive = true;
+    this.rankUpEffectTimer = 3.5;
+    // Golden ascending particles around the player
+    const colors = [0xffdd44, 0xffcc00, 0xffaa00, 0xffffff, 0xffee88];
+    for (let i = 0; i < 40; i++) {
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      const m = new Mesh(
+        new BoxGeometry(0.04, 0.04, 0.04),
+        new MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.0, transparent: true, opacity: 1 })
+      );
+      const angle = Math.random() * Math.PI * 2;
+      const r = 0.3 + Math.random() * 0.8;
+      m.position.set(
+        this.playerW.pos.x + Math.cos(angle) * r,
+        0.5 + Math.random() * 0.5,
+        this.playerW.pos.z + Math.sin(angle) * r
+      );
+      m.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      this.scene.add(m);
+      this.rankUpParticles.push({
+        mesh: m,
+        vel: new Vector3((Math.random() - 0.5) * 0.5, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 0.5),
+        life: 2.5 + Math.random() * 1.0,
+        maxLife: 3.5,
+      });
+    }
+  }
+
+  private updateRankUpEffect(dt: number) {
+    if (!this.rankUpActive) return;
+    this.rankUpEffectTimer -= dt;
+    for (let i = this.rankUpParticles.length - 1; i >= 0; i--) {
+      const p = this.rankUpParticles[i];
+      p.vel.y -= 0.3 * dt; // Slow gravity for floaty feel
+      p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
+      p.mesh.rotation.x += dt * 2;
+      p.mesh.rotation.y += dt * 3;
+      p.life -= dt;
+      const t = Math.max(0, p.life / p.maxLife);
+      (p.mesh.material as MeshStandardMaterial).opacity = t;
+      (p.mesh.material as MeshStandardMaterial).emissiveIntensity = t * 1.5;
+      if (p.life <= 0) {
+        this.scene.remove(p.mesh);
+        p.mesh.geometry.dispose();
+        (p.mesh.material as MeshStandardMaterial).dispose();
+        this.rankUpParticles.splice(i, 1);
+      }
+    }
+    if (this.rankUpEffectTimer <= 0) this.rankUpActive = false;
   }
 
   private createWrestler(isPlayer: boolean, color: number, weight: number, speed: number): Wrestler {
@@ -921,6 +1028,34 @@ export class SumoSystem extends createSystem({}) {
     this.updateSpectators(dt, time);
     this.updateCelebration(delta);
     this.updateZabuton(delta);
+    this.updateChargeMeter(dt);
+    this.updateRankUpEffect(delta);
+  }
+
+  private updateChargeMeter(dt: number) {
+    const p = this.playerW;
+    if (p.isCharging && (this.gameData.state === 'playing' || this.gameData.state === 'survival')) {
+      const power = Math.min(p.chargeTime / 1.5, 1.0); // Normalized 0-1
+      this.gameData.chargeDisplayPower = power;
+      this.chargeMeterGroup.visible = true;
+      // Position above player
+      this.chargeMeterGroup.position.set(p.pos.x, 1.8 * p.heightScale + 0.4, p.pos.z);
+      this.chargeMeterGroup.lookAt(this.camera.position);
+      // Scale the fill bar
+      this.chargeMeterBar.scale.x = Math.max(0.01, power);
+      this.chargeMeterBar.position.x = -(1 - power) * 0.3;
+      // Color transition: orange → red as it charges
+      const barMat = this.chargeMeterBar.material as MeshStandardMaterial;
+      const r = 1.0;
+      const g = Math.max(0, 0.53 - power * 0.4);
+      const b = 0;
+      barMat.color.setRGB(r, g, b);
+      barMat.emissive.setRGB(r * 0.8, g * 0.6, 0);
+      barMat.emissiveIntensity = 0.6 + power * 0.8;
+    } else {
+      this.chargeMeterGroup.visible = false;
+      this.gameData.chargeDisplayPower = 0;
+    }
   }
 
   private updateGyoji(dt: number, time: number) {
@@ -1130,6 +1265,7 @@ export class SumoSystem extends createSystem({}) {
       t.damageFlash = 1;
       a.pushAnim = 1;
       this.spawn(new Vector3().lerpVectors(a.pos, t.pos, 0.5).setY(0.8), 0xffaa44, 8);
+      this.spawnSandSpray(new Vector3().lerpVectors(a.pos, t.pos, 0.6), 0.5);
       this.shakeIntensity = 0.05;
       this.shakeDecay = 3;
       this.sfx('push');
@@ -1148,6 +1284,7 @@ export class SumoSystem extends createSystem({}) {
       t.damageFlash = 1;
       a.grabAnim = 1;
       this.spawn(new Vector3().lerpVectors(a.pos, t.pos, 0.5).setY(0.8), 0xff44ff, 10);
+      this.spawnSandSpray(new Vector3().lerpVectors(a.pos, t.pos, 0.5), 0.7);
       this.shakeIntensity = 0.08;
       this.shakeDecay = 3;
       this.sfx('grab');
@@ -1177,6 +1314,7 @@ export class SumoSystem extends createSystem({}) {
       t.stagger = 0.5;
       t.damageFlash = 1;
       this.spawn(new Vector3().lerpVectors(a.pos, t.pos, 0.5).setY(0.8), 0xff8800, 15);
+      this.spawnSandSpray(new Vector3().lerpVectors(a.pos, t.pos, 0.5), 1.0);
       this.shakeIntensity = 0.15;
       this.shakeDecay = 4;
       this.sfx('charge');
@@ -1345,6 +1483,7 @@ export class SumoSystem extends createSystem({}) {
     this.scene.add(this.fallGroup);
     w.group.visible = false;
     this.spawn(w.pos.clone().setY(0.5), 0xff8800, 20);
+    this.spawnSandSpray(w.pos.clone(), 1.5);
     this.shakeIntensity = 0.2;
     this.shakeDecay = 5;
     this.sfx('ringout');
@@ -1366,7 +1505,16 @@ export class SumoSystem extends createSystem({}) {
       this.gameData.score += 500 + Math.floor(this.gameData.roundTime * 10) + (this.gameData.currentRank + 1) * 100;
       // Combo bonus
       if (this.gameData.comboCount >= 2) this.gameData.score += this.gameData.comboCount * 100;
+      const prevRank = this.gameData.currentRank;
       if (this.gameData.matchWins % 3 === 0 && this.gameData.currentRank < RANKS.length - 1) this.gameData.currentRank++;
+      // Rank-up celebration
+      if (this.gameData.currentRank > prevRank) {
+        this.gameData.rankUpPending = true;
+        this.gameData.rankUpFrom = prevRank;
+        this.gameData.rankUpTo = this.gameData.currentRank;
+        this.gameData.rankUpTimer = 3.0;
+        this.triggerRankUpEffect();
+      }
       this.gameData.winTechnique = getWinningTechnique(this.gameData.lastAction);
       this.spawnCelebration();
       // Check for upset win: beating an opponent with much higher weight
@@ -1425,6 +1573,14 @@ export class SumoSystem extends createSystem({}) {
         if (this.gameData.inTournament) this.gameData.inTournament = false;
       }
     }
+    // Track match history
+    this.gameData.matchHistory.unshift({
+      opponent: this.gameData.currentOpponent?.name ?? 'UNKNOWN',
+      result: this.gameData.matchResult ?? 'loss',
+      technique: this.gameData.winTechnique,
+      score: this.gameData.score,
+    });
+    if (this.gameData.matchHistory.length > 10) this.gameData.matchHistory.pop();
     this.saveStats();
     this.gameData.state = 'results';
   }
@@ -1604,6 +1760,31 @@ export class SumoSystem extends createSystem({}) {
   isHariteAvailable(): boolean { return this.gameData.currentRank >= 5; }
   getHariteCD(): number { return this.gameData.hariteCooldown; }
   isUpsetWin(): boolean { return this.gameData.isUpsetWin; }
+  getMatchHistory() { return this.gameData.matchHistory; }
+  getRankUpInfo() { return { pending: this.gameData.rankUpPending, from: this.gameData.rankUpFrom, to: this.gameData.rankUpTo, timer: this.gameData.rankUpTimer, fromName: RANKS[this.gameData.rankUpFrom], toName: RANKS[this.gameData.rankUpTo] }; }
+  clearRankUp() { this.gameData.rankUpPending = false; }
+
+  prepareScout() {
+    // Prepare the next opponent for scouting display
+    const idx = Math.min(this.gameData.currentRank + Math.floor(Math.random() * 3), OPPONENT_POOL.length - 1);
+    this.gameData.currentOpponent = OPPONENT_POOL[idx];
+    this.gameData.state = 'scouting';
+  }
+
+  getScoutOpponent() {
+    return this.gameData.currentOpponent;
+  }
+
+  getScoutWarning(): string {
+    const opp = this.gameData.currentOpponent;
+    if (!opp) return '';
+    const warnings: string[] = [];
+    if (opp.weight >= 1.5) warnings.push('Heavy — hard to push!');
+    if (opp.speed >= 1.2) warnings.push('Fast — watch for sidesteps!');
+    if (opp.technique >= 0.7) warnings.push('Technical — expect henka and grabs!');
+    if (opp.aggression >= 0.8) warnings.push('Aggressive — relentless attacker!');
+    return warnings.join(' ');
+  }
   continueAfterSurvivalWin() {
     if (this.gameData.inSurvival && this.gameData.matchResult === 'win') {
       this.nextSurvivalWave();

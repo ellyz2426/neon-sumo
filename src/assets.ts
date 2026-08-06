@@ -34,4 +34,9 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Stats Panel',
   },
+  'scout-panel': {
+    url: publicAssetUrl('ui/scout.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Scout Panel',
+  },
 });

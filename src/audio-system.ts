@@ -10,6 +10,8 @@ export class AudioSystem extends createSystem({}) {
   private musicBeat = 0;
   private beatTimer = 0;
   private bpm = 80;
+  private chantTimer = 0;
+  private chantBeat = 0;
 
   init() {
     this.sumo = this.world.getSystem(SumoSystem)!;
@@ -103,6 +105,58 @@ export class AudioSystem extends createSystem({}) {
       this.bpm = 80;
     }
     if (this.master) this.master.gain.value = d.sfxOn ? 0.3 : 0;
+    // Crowd chanting during active play
+    if ((d.state === 'playing' || d.state === 'survival') && d.sfxOn && !d.isCountdown && !d.tachiai) {
+      this.tickChanting(delta, d);
+    } else {
+      this.chantTimer = 0;
+      this.chantBeat = 0;
+    }
+  }
+
+  private tickChanting(delta: number, d: ReturnType<SumoSystem['getGameData']>) {
+    if (!this.ctx || !this.master) return;
+    // Chant every ~2 seconds, more frequent as tension rises
+    const tensionFactor = Math.max(0.5, 1 - d.playerStamina / 100);
+    const chantInterval = 2.0 - tensionFactor * 0.8;
+    this.chantTimer += delta;
+    if (this.chantTimer < chantInterval) return;
+    this.chantTimer -= chantInterval;
+    this.chantBeat++;
+
+    const c = this.ctx;
+    const now = c.currentTime;
+
+    // Crowd "hoh" / "yoi" rhythmic chant using filtered noise + tone
+    const bs = Math.floor(c.sampleRate * 0.25);
+    const buf = c.createBuffer(1, bs, c.sampleRate);
+    const bd = buf.getChannelData(0);
+    // Shape as a vowel-like burst
+    for (let i = 0; i < bs; i++) {
+      const env = Math.sin(Math.PI * i / bs); // bell envelope
+      bd[i] = (Math.random() * 2 - 1) * env * 0.3;
+    }
+    const src = c.createBufferSource(); src.buffer = buf;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass';
+    // Alternate between two vowel formants for variety
+    bp.frequency.value = this.chantBeat % 2 === 0 ? 400 : 550;
+    bp.Q.value = 2.5;
+    const chantGain = c.createGain();
+    const vol = 0.04 + tensionFactor * 0.06; // Louder when tense
+    chantGain.gain.setValueAtTime(vol, now);
+    chantGain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    src.connect(bp); bp.connect(chantGain); chantGain.connect(this.master);
+    src.start(now); src.stop(now + 0.3);
+
+    // Add a subtle tonal component for the "oh" sound
+    const tone = c.createOscillator();
+    tone.type = 'sine';
+    tone.frequency.value = this.chantBeat % 2 === 0 ? 180 : 220;
+    const tg = c.createGain();
+    tg.gain.setValueAtTime(vol * 0.3, now);
+    tg.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    tone.connect(tg); tg.connect(this.master);
+    tone.start(now); tone.stop(now + 0.2);
   }
 
   private tickMusic(delta: number) {

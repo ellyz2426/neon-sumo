@@ -1,0 +1,136 @@
+<style>
+  .root {
+    flex-direction: column;
+    align-items: center;
+    padding: 30;
+    gap: 10;
+    background-color: rgba(10, 0, 0, 0.94);
+    border-radius: 16;
+    border-width: 2;
+    border-color: rgba(255, 100, 50, 0.6);
+    width: 380;
+  }
+  .title {
+    font-size: 28;
+    color: #ff9944;
+  }
+  .opponent-name {
+    font-size: 32;
+    color: #ffcc44;
+  }
+  .divider {
+    height: 1;
+    width: 320;
+    background-color: rgba(255, 170, 50, 0.3);
+  }
+  .stat-row {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 300;
+    align-items: center;
+  }
+  .stat-label {
+    font-size: 16;
+    color: rgba(200, 180, 140, 0.8);
+  }
+  .stat-value {
+    font-size: 16;
+    color: #ffdd88;
+  }
+  .bar-outer {
+    width: 160;
+    height: 12;
+    background-color: rgba(50, 50, 50, 0.8);
+    border-radius: 4;
+  }
+  .bar-weight {
+    width: 80;
+    height: 12;
+    background-color: #ff6644;
+    border-radius: 4;
+  }
+  .bar-speed {
+    width: 80;
+    height: 12;
+    background-color: #44ccff;
+    border-radius: 4;
+  }
+  .bar-aggro {
+    width: 80;
+    height: 12;
+    background-color: #ff4444;
+    border-radius: 4;
+  }
+  .bar-tech {
+    width: 80;
+    height: 12;
+    background-color: #44ff88;
+    border-radius: 4;
+  }
+  .subtitle {
+    font-size: 14;
+    color: rgba(255, 200, 100, 0.6);
+  }
+  .record-text {
+    font-size: 14;
+    color: rgba(180, 160, 120, 0.7);
+  }
+  .btn {
+    padding: 14;
+    background-color: rgba(200, 60, 30, 0.35);
+    border-radius: 8;
+    width: 260;
+    align-items: center;
+    cursor: pointer;
+    border-width: 1;
+    border-color: rgba(255, 100, 50, 0.5);
+  }
+  .btn-text {
+    font-size: 20;
+    color: #ffdd88;
+  }
+  .warning {
+    font-size: 12;
+    color: rgba(255, 120, 60, 0.7);
+  }
+</style>
+<Panel class="root">
+  <div class="title">NEXT OPPONENT</div>
+  <div class="opponent-name" id="scout-name">TARO</div>
+  <div class="subtitle" id="scout-rank">Rank Match</div>
+  <div class="divider"></div>
+  <div class="stat-row">
+    <div class="stat-label">Weight</div>
+    <div class="bar-outer">
+      <div class="bar-weight" id="scout-weight-bar"></div>
+    </div>
+    <div class="stat-value" id="scout-weight">0.7</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-label">Speed</div>
+    <div class="bar-outer">
+      <div class="bar-speed" id="scout-speed-bar"></div>
+    </div>
+    <div class="stat-value" id="scout-speed">1.2</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-label">Aggression</div>
+    <div class="bar-outer">
+      <div class="bar-aggro" id="scout-aggro-bar"></div>
+    </div>
+    <div class="stat-value" id="scout-aggro">0.3</div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-label">Technique</div>
+    <div class="bar-outer">
+      <div class="bar-tech" id="scout-tech-bar"></div>
+    </div>
+    <div class="stat-value" id="scout-tech">0.2</div>
+  </div>
+  <div class="divider"></div>
+  <div class="warning" id="scout-warning"></div>
+  <div class="record-text" id="scout-record">Your Record: 0W - 0L</div>
+  <div class="btn" id="btn-fight">
+    <div class="btn-text">FIGHT!</div>
+  </div>
+</Panel>
