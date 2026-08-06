@@ -143,6 +143,16 @@ export interface GameData {
   rankUpTimer: number;
   matchHistory: { opponent: string; result: string; technique: string; score: number }[];
   chargeDisplayPower: number;
+  playerBeltColor: number;
+  matchPushes: number;
+  matchGrabs: number;
+  matchDodges: number;
+  matchHenkas: number;
+  matchCharges: number;
+  matchMaxCombo: number;
+  edgeDanger: number;
+  yokozunaEntrance: boolean;
+  yokozunaEntranceTimer: number;
 }
 
 const COLOR_SCHEMES = [
@@ -179,6 +189,18 @@ const WINNING_TECHNIQUES = [
   'Oshidashi', 'Yorikiri', 'Hatakikomi', 'Uwatenage',
   'Okuridashi', 'Tsukiotoshi', 'Kotenage', 'Sukuinage',
   'Shitatenage', 'Oshitaoshi', 'Hikiotoshi', 'Tsukidashi',
+];
+
+
+const BELT_COLORS = [
+  { name: 'Blue', color: 0x00aaff },
+  { name: 'Red', color: 0xff2244 },
+  { name: 'Gold', color: 0xffcc00 },
+  { name: 'Purple', color: 0xaa44ff },
+  { name: 'Green', color: 0x44cc44 },
+  { name: 'White', color: 0xeeeeff },
+  { name: 'Black', color: 0x222222 },
+  { name: 'Pink', color: 0xff66aa },
 ];
 
 function getWinningTechnique(lastAction: string): string {
@@ -234,6 +256,11 @@ export class SumoSystem extends createSystem({}) {
   private rankUpActive = false;
   private rankUpEffectTimer = 0;
   private sandSprayTimer = 0;
+  private edgeDangerRing!: Mesh;
+  private edgeDangerPulse = 0;
+  private yokozunaParticles: Particle[] = [];
+  private yokozunaRopeLeft!: Group;
+  private yokozunaRopeRight!: Group;
 
   init() {
     this.gameData = {
@@ -252,11 +279,15 @@ export class SumoSystem extends createSystem({}) {
       hariteCooldown: 0, isUpsetWin: false, zabutonActive: false,
       rankUpPending: false, rankUpFrom: 0, rankUpTo: 0, rankUpTimer: 0,
       matchHistory: [], chargeDisplayPower: 0,
+      playerBeltColor: 0, matchPushes: 0, matchGrabs: 0, matchDodges: 0,
+      matchHenkas: 0, matchCharges: 0, matchMaxCombo: 0, edgeDanger: 0,
+      yokozunaEntrance: false, yokozunaEntranceTimer: 0,
     };
     this.loadStats();
     this.buildArena();
     this.buildGyoji();
     this.buildChargeMeter();
+    this.buildYokozunaRope();
     this.playerW = this.createWrestler(true, 0x00aaff, 1.0, 1.0);
     this.opponentW = this.createWrestler(false, 0xff4422, 1.0, 1.0);
     this.resetPositions();
@@ -328,6 +359,15 @@ export class SumoSystem extends createSystem({}) {
     centerMark.rotation.x = -Math.PI / 2;
     centerMark.position.y = 0.37;
     this.arenaGroup.add(centerMark);
+
+    // Edge danger ring (warning ring that glows when player is near edge)
+    this.edgeDangerRing = new Mesh(
+      new TorusGeometry(RING_RADIUS - 0.5, 0.06, 8, 64),
+      new MeshStandardMaterial({ color: 0xff2222, emissive: 0xff0000, emissiveIntensity: 0, transparent: true, opacity: 0 })
+    );
+    this.edgeDangerRing.rotation.x = -Math.PI / 2;
+    this.edgeDangerRing.position.y = 0.41;
+    this.arenaGroup.add(this.edgeDangerRing);
 
     // Starting lines (shikiri-sen)
     for (const z of [-0.6, 0.6]) {
@@ -518,6 +558,39 @@ export class SumoSystem extends createSystem({}) {
     this.chargeMeterGroup.add(this.chargeMeterBar);
     this.chargeMeterGroup.visible = false;
     this.scene.add(this.chargeMeterGroup);
+  }
+
+  private buildYokozunaRope() {
+    // Yokozuna entrance rope (tsuna) — shown during yokozuna entrance ceremony
+    const createRope = () => {
+      const g = new Group();
+      // Main rope
+      const rope = new Mesh(
+        new TorusGeometry(0.4, 0.04, 8, 32, Math.PI),
+        new MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffdd, emissiveIntensity: 0.3 })
+      );
+      rope.position.y = 0.5;
+      g.add(rope);
+      // Shide (zigzag paper)
+      for (let i = 0; i < 3; i++) {
+        const shide = new Mesh(
+          new BoxGeometry(0.06, 0.2, 0.01),
+          new MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.4, transparent: true, opacity: 0.9 })
+        );
+        shide.position.set(-0.2 + i * 0.2, 0.25, 0);
+        shide.rotation.z = (i - 1) * 0.2;
+        g.add(shide);
+      }
+      g.visible = false;
+      return g;
+    };
+    this.yokozunaRopeLeft = createRope();
+    this.yokozunaRopeLeft.position.set(-0.6, 0.6, 0);
+    this.playerW.group.add(this.yokozunaRopeLeft);
+    this.yokozunaRopeRight = createRope();
+    this.yokozunaRopeRight.position.set(0.6, 0.6, 0);
+    this.yokozunaRopeRight.scale.x = -1;
+    this.playerW.group.add(this.yokozunaRopeRight);
   }
 
   private spawnSandSpray(pos: Vector3, intensity: number) {
@@ -726,6 +799,25 @@ export class SumoSystem extends createSystem({}) {
     this.celebrationActive = false;
     this.spawnSalt(this.playerW.pos);
     this.spawnSalt(this.opponentW.pos);
+    this.gameData.matchPushes = 0;
+    this.gameData.matchGrabs = 0;
+    this.gameData.matchDodges = 0;
+    this.gameData.matchHenkas = 0;
+    this.gameData.matchCharges = 0;
+    this.gameData.matchMaxCombo = 0;
+    this.gameData.edgeDanger = 0;
+    // Check for Yokozuna entrance
+    if (this.gameData.currentRank >= RANKS.length - 1) {
+      this.gameData.yokozunaEntrance = true;
+      this.gameData.yokozunaEntranceTimer = 3.0;
+      this.yokozunaRopeLeft.visible = true;
+      this.yokozunaRopeRight.visible = true;
+      this.spawnYokozunaParticles();
+    } else {
+      this.gameData.yokozunaEntrance = false;
+      this.yokozunaRopeLeft.visible = false;
+      this.yokozunaRopeRight.visible = false;
+    }
     this.gameData.state = 'playing';
   }
 
@@ -905,6 +997,7 @@ export class SumoSystem extends createSystem({}) {
     this.gameData.comboTimer = COMBO_WINDOW;
     if (this.gameData.comboCount >= 2) {
       this.gameData.lastComboText = `${this.gameData.comboCount}x COMBO!`;
+      if (this.gameData.comboCount > this.gameData.matchMaxCombo) this.gameData.matchMaxCombo = this.gameData.comboCount;
       this.gameData.score += this.gameData.comboCount * 50;
     }
   }
@@ -1005,6 +1098,20 @@ export class SumoSystem extends createSystem({}) {
         this.playerW.stamina = Math.min(MAX_STAMINA, this.playerW.stamina + STAMINA_REGEN * dt);
         this.opponentW.stamina = Math.min(MAX_STAMINA, this.opponentW.stamina + STAMINA_REGEN * dt);
       }
+      // Edge danger tracking
+      const playerDist = Math.sqrt(this.playerW.pos.x ** 2 + this.playerW.pos.z ** 2);
+      this.gameData.edgeDanger = Math.max(0, (playerDist / RING_RADIUS - 0.6) / 0.4); // 0-1 danger scale
+
+      // Yokozuna entrance
+      if (this.gameData.yokozunaEntrance) {
+        this.gameData.yokozunaEntranceTimer -= dt;
+        if (this.gameData.yokozunaEntranceTimer <= 0) {
+          this.gameData.yokozunaEntrance = false;
+          this.yokozunaRopeLeft.visible = false;
+          this.yokozunaRopeRight.visible = false;
+        }
+      }
+
       this.gameData.playerPushCD = this.playerW.pushCooldown;
       this.gameData.playerGrabCD = this.playerW.grabCooldown;
       this.gameData.playerDodgeCD = this.playerW.dodgeCooldown;
@@ -1151,6 +1258,7 @@ export class SumoSystem extends createSystem({}) {
       p.pushCooldown = 0.5;
       p.stamina -= PUSH_STAMINA;
       this.gameData.totalPushes++;
+      this.gameData.matchPushes++;
       this.gameData.lastAction = 'push';
       this.addCombo('push');
     }
@@ -1162,6 +1270,7 @@ export class SumoSystem extends createSystem({}) {
       p.grabCooldown = 1.5;
       p.stamina -= GRAB_STAMINA;
       this.gameData.totalGrabs++;
+      this.gameData.matchGrabs++;
       this.gameData.lastAction = 'grab';
       this.addCombo('grab');
     }
@@ -1173,6 +1282,7 @@ export class SumoSystem extends createSystem({}) {
       p.dodgeCooldown = 1.0;
       p.stamina -= DODGE_STAMINA;
       this.gameData.totalDodges++;
+      this.gameData.matchDodges++;
     }
 
     // Charge
@@ -1184,6 +1294,7 @@ export class SumoSystem extends createSystem({}) {
         this.doCharge(p, this.opponentW);
         p.stamina -= CHARGE_STAMINA;
         this.gameData.lastAction = 'charge';
+        this.gameData.matchCharges++;
         this.addCombo('charge');
       }
       p.isCharging = false;
@@ -1198,6 +1309,7 @@ export class SumoSystem extends createSystem({}) {
       p.henkaCooldown = 2.0;
       p.stamina -= HENKA_STAMINA;
       this.gameData.totalHenkas++;
+      this.gameData.matchHenkas++;
       this.gameData.lastAction = 'henka';
       this.addCombo('henka');
     }
@@ -1698,6 +1810,43 @@ export class SumoSystem extends createSystem({}) {
 
     const exciteMult = 1 + this.crowdExcitement * 1.5;
     for (const l of this.crowdLights) l.intensity = (0.8 + Math.sin(time * 5 + l.position.x) * 0.2) * exciteMult;
+    // Edge danger ring visual
+    const dangerMat = this.edgeDangerRing.material as MeshStandardMaterial;
+    if (this.gameData.edgeDanger > 0 && (this.gameData.state === 'playing' || this.gameData.state === 'survival')) {
+      this.edgeDangerPulse += dt * 6;
+      const dangerAlpha = this.gameData.edgeDanger * (0.4 + Math.sin(this.edgeDangerPulse) * 0.2);
+      dangerMat.opacity = dangerAlpha;
+      dangerMat.emissiveIntensity = this.gameData.edgeDanger * (0.8 + Math.sin(this.edgeDangerPulse) * 0.4);
+    } else {
+      dangerMat.opacity = 0;
+      dangerMat.emissiveIntensity = 0;
+      this.edgeDangerPulse = 0;
+    }
+
+    // Yokozuna entrance effects
+    if (this.gameData.yokozunaEntrance) {
+      const yTimer = this.gameData.yokozunaEntranceTimer;
+      const yScale = Math.sin(yTimer * 2) * 0.05;
+      this.yokozunaRopeLeft.rotation.z = Math.sin(yTimer * 3) * 0.1;
+      this.yokozunaRopeRight.rotation.z = -Math.sin(yTimer * 3) * 0.1;
+      this.playerW.group.scale.setScalar(1 + yScale);
+      // Update yokozuna particles
+      for (let i = this.yokozunaParticles.length - 1; i >= 0; i--) {
+        const p = this.yokozunaParticles[i];
+        p.mesh.position.y += dt * 0.8;
+        p.mesh.rotation.y += dt * 2;
+        p.life -= dt;
+        const t = Math.max(0, p.life / p.maxLife);
+        (p.mesh.material as MeshStandardMaterial).opacity = t * 0.8;
+        if (p.life <= 0) {
+          this.scene.remove(p.mesh);
+          p.mesh.geometry.dispose();
+          (p.mesh.material as MeshStandardMaterial).dispose();
+          this.yokozunaParticles.splice(i, 1);
+        }
+      }
+    }
+
     for (const d of this.dustParticles) { d.position.y = 0.4 + Math.sin(time * 1.5 + d.position.x * 3) * 0.15; d.position.x += Math.sin(time * 0.5 + d.position.z) * dt * 0.1; }
   }
 
@@ -1736,6 +1885,54 @@ export class SumoSystem extends createSystem({}) {
       if (this.shakeIntensity < 0.001) this.shakeIntensity = 0;
     }
     c.lookAt(0, 0.5, 0);
+  }
+
+  private spawnYokozunaParticles() {
+    const colors = [0xffffff, 0xffeecc, 0xffdd88, 0xffffee];
+    for (let i = 0; i < 30; i++) {
+      const c = colors[Math.floor(Math.random() * colors.length)];
+      const m = new Mesh(
+        new BoxGeometry(0.03, 0.15, 0.01),
+        new MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.6, transparent: true, opacity: 0.8 })
+      );
+      const angle = Math.random() * Math.PI * 2;
+      const r = 0.5 + Math.random() * 1.5;
+      m.position.set(
+        this.playerW.pos.x + Math.cos(angle) * r,
+        0.4 + Math.random() * 0.3,
+        this.playerW.pos.z + Math.sin(angle) * r
+      );
+      m.rotation.set(Math.random() * 0.5, Math.random() * Math.PI, Math.random() * 0.3);
+      this.scene.add(m);
+      this.yokozunaParticles.push({
+        mesh: m,
+        vel: new Vector3(0, 0.5, 0),
+        life: 2.5 + Math.random() * 0.5,
+        maxLife: 3.0,
+      });
+    }
+  }
+
+  setPlayerBeltColor(idx: number) {
+    if (idx >= 0 && idx < BELT_COLORS.length) {
+      this.gameData.playerBeltColor = idx;
+      const c = new Color(BELT_COLORS[idx].color);
+      (this.playerW.belt.material as MeshStandardMaterial).color.copy(c);
+      (this.playerW.belt.material as MeshStandardMaterial).emissive.copy(c);
+    }
+  }
+  getPlayerBeltColor(): number { return this.gameData.playerBeltColor; }
+  getBeltColorName(): string { return BELT_COLORS[this.gameData.playerBeltColor]?.name ?? 'Blue'; }
+  getMatchStats() {
+    return {
+      pushes: this.gameData.matchPushes,
+      grabs: this.gameData.matchGrabs,
+      dodges: this.gameData.matchDodges,
+      henkas: this.gameData.matchHenkas,
+      charges: this.gameData.matchCharges,
+      maxCombo: this.gameData.matchMaxCombo,
+      timeUsed: MATCH_TIME - Math.max(0, this.gameData.roundTime),
+    };
   }
 
   getGameData(): GameData { return this.gameData; }

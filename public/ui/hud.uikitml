@@ -108,6 +108,11 @@
     font-size: 12;
     color: #ffaa88;
   }
+  .danger-text {
+    font-size: 14;
+    color: #ff4444;
+    align-items: center;
+  }
 </style>
 <Panel class="root">
   <div class="countdown" id="countdown"></div>
@@ -127,6 +132,7 @@
     <div class="streak" id="streak"></div>
   </div>
   <div class="tourney-info" id="tourney-info"></div>
+  <div class="danger-text" id="danger-text"></div>
   <div class="divider"></div>
   <div class="row">
     <div class="stamina-label" id="stamina-label">Stamina: 100%</div>

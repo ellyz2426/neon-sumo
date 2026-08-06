@@ -89,6 +89,15 @@ export class UISystem extends createSystem({}) {
     this.settingsPanel?.getElementById('btn-scheme3')?.addEventListener('click', () => { this.sumo.setColorScheme(3); this.updateSettings(); });
     this.settingsPanel?.getElementById('btn-sfx')?.addEventListener('click', () => { const d = this.sumo.getGameData(); this.sumo.setSfx(!d.sfxOn); this.updateSettings(); });
     this.settingsPanel?.getElementById('btn-music')?.addEventListener('click', () => { const d = this.sumo.getGameData(); this.sumo.setMusic(!d.musicOn); this.updateSettings(); });
+    // Belt color buttons
+    for (let i = 0; i < 8; i++) {
+      const idx = i;
+      this.settingsPanel?.getElementById(`btn-belt${i}`)?.addEventListener('click', () => {
+        this.sumo.setPlayerBeltColor(idx);
+        this.updateSettings();
+      });
+    }
+
     this.settingsPanel?.getElementById('btn-back')?.addEventListener('click', () => { this.sumo.setState('menu'); this.showOnly('menu'); });
 
     this.statsPanel?.getElementById('btn-back')?.addEventListener('click', () => { this.sumo.setState('menu'); this.showOnly('menu'); });
@@ -234,6 +243,10 @@ export class UISystem extends createSystem({}) {
     const rankUpText = this.rankUpDisplayTimer > 0 ? `⬆ RANK UP: ${ru.toName}! ⬆` : '';
     h.getElementById('tachiai-text')?.setProperties({ text: rankUpText || (d.tachiai ? '⚡ TACHIAI ⚡' : '') });
 
+    // Edge danger indicator
+    const dangerText = d.edgeDanger > 0.3 ? (d.edgeDanger > 0.7 ? '⚠ DANGER — NEAR EDGE! ⚠' : '⚠ Watch the edge!') : '';
+    h.getElementById('danger-text')?.setProperties({ text: dangerText });
+
     // Cooldown indicators
     h.getElementById('push-cd')?.setProperties({ text: d.playerPushCD > 0 ? `Push: ${d.playerPushCD.toFixed(1)}s` : (d.playerStamina < 15 ? 'Push: LOW' : 'Push: READY') });
     h.getElementById('grab-cd')?.setProperties({ text: d.playerGrabCD > 0 ? `Grab: ${d.playerGrabCD.toFixed(1)}s` : (d.playerStamina < 25 ? 'Grab: LOW' : 'Grab: READY') });
@@ -266,6 +279,15 @@ export class UISystem extends createSystem({}) {
     const comboBonus = d.comboCount >= 2 ? `Combo Bonus: +${d.comboCount * 100}` : '';
     r.getElementById('result-combo')?.setProperties({ text: comboBonus });
     r.getElementById('upset-text')?.setProperties({ text: this.sumo.isUpsetWin() ? '座布団 ZABUTON THROW!' : '' });
+
+    // Match breakdown stats
+    const ms = this.sumo.getMatchStats();
+    r.getElementById('match-time-stat')?.setProperties({ text: `${Math.round(ms.timeUsed)}s` });
+    r.getElementById('match-attacks-stat')?.setProperties({ text: `${ms.pushes} / ${ms.grabs} / ${ms.dodges}` });
+    r.getElementById('match-specials-stat')?.setProperties({ text: `${ms.charges} / ${ms.henkas}` });
+    r.getElementById('match-combo-stat')?.setProperties({ text: `${ms.maxCombo}x` });
+    const dangerText = d.edgeDanger > 0.5 ? '⚠ Close finish — near the edge!' : '';
+    r.getElementById('match-danger-stat')?.setProperties({ text: dangerText });
 
     // Rank-up display on results
     const ru = this.sumo.getRankUpInfo();
@@ -305,6 +327,7 @@ export class UISystem extends createSystem({}) {
     s.getElementById('sfx-label')?.setProperties({ text: `SFX: ${d.sfxOn ? 'ON' : 'OFF'}` });
     s.getElementById('music-label')?.setProperties({ text: `Music: ${d.musicOn ? 'ON' : 'OFF'}` });
     s.getElementById('scheme-label')?.setProperties({ text: `Theme: ${['Dohyo Classic', 'Neon Arena', 'Cherry Blossom', 'Thunder'][d.colorScheme]}` });
+    s.getElementById('belt-label')?.setProperties({ text: `Belt: ${this.sumo.getBeltColorName()}` });
   }
 
   private updateStats() {

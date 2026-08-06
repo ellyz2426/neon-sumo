@@ -8,7 +8,7 @@
     border-radius: 16;
     border-width: 2;
     border-color: rgba(255, 170, 50, 0.6);
-    width: 400;
+    width: 420;
   }
   .title {
     font-size: 24;
@@ -54,7 +54,7 @@
   .section {
     flex-direction: column;
     gap: 6;
-    width: 360;
+    width: 380;
   }
   .section-title {
     font-size: 16;
@@ -69,6 +69,27 @@
     cursor: pointer;
     border-width: 1;
     border-color: rgba(255, 170, 50, 0.4);
+  }
+  .belt-row {
+    flex-direction: row;
+    gap: 6;
+    align-items: center;
+    flex-wrap: wrap;
+    width: 380;
+  }
+  .belt-btn {
+    padding: 5;
+    background-color: rgba(100, 100, 100, 0.2);
+    border-radius: 4;
+    align-items: center;
+    cursor: pointer;
+    border-width: 1;
+    border-color: rgba(255, 170, 50, 0.3);
+    width: 56;
+  }
+  .belt-text {
+    font-size: 9;
+    color: #ffdd88;
   }
 </style>
 <Panel class="root">
@@ -105,6 +126,37 @@
       </div>
       <div class="btn-sm" id="btn-scheme3">
         <div class="btn-text-sm">Thunder</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Mawashi (Belt)</div>
+    <div class="label" id="belt-label">Belt: Blue</div>
+    <div class="belt-row">
+      <div class="belt-btn" id="btn-belt0">
+        <div class="belt-text">Blue</div>
+      </div>
+      <div class="belt-btn" id="btn-belt1">
+        <div class="belt-text">Red</div>
+      </div>
+      <div class="belt-btn" id="btn-belt2">
+        <div class="belt-text">Gold</div>
+      </div>
+      <div class="belt-btn" id="btn-belt3">
+        <div class="belt-text">Purple</div>
+      </div>
+      <div class="belt-btn" id="btn-belt4">
+        <div class="belt-text">Green</div>
+      </div>
+      <div class="belt-btn" id="btn-belt5">
+        <div class="belt-text">White</div>
+      </div>
+      <div class="belt-btn" id="btn-belt6">
+        <div class="belt-text">Black</div>
+      </div>
+      <div class="belt-btn" id="btn-belt7">
+        <div class="belt-text">Pink</div>
       </div>
     </div>
   </div>
