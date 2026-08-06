@@ -1,0 +1,159 @@
+<style>
+  .root {
+    flex-direction: column;
+    padding: 10;
+    gap: 4;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 8;
+    width: 320;
+  }
+  .row {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 300;
+    align-items: center;
+  }
+  .score {
+    font-size: 20;
+    color: #ffcc44;
+  }
+  .time {
+    font-size: 18;
+    color: #ff8844;
+  }
+  .rank {
+    font-size: 14;
+    color: #88ccff;
+  }
+  .opponent {
+    font-size: 16;
+    color: #ff6644;
+  }
+  .info {
+    font-size: 12;
+    color: rgba(200, 200, 200, 0.8);
+  }
+  .streak {
+    font-size: 14;
+    color: #ffaa00;
+  }
+  .countdown {
+    font-size: 32;
+    color: #ffffff;
+    align-items: center;
+  }
+  .tachiai-text {
+    font-size: 16;
+    color: #ffcc44;
+    align-items: center;
+  }
+  .combo-text {
+    font-size: 18;
+    color: #ff44ff;
+    align-items: center;
+  }
+  .slowmo-text {
+    font-size: 12;
+    color: #44ffff;
+    align-items: center;
+  }
+  .pause-btn {
+    padding: 4;
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 4;
+    cursor: pointer;
+    align-items: center;
+    width: 60;
+  }
+  .pause-text {
+    font-size: 10;
+    color: rgba(255, 255, 255, 0.7);
+  }
+  .cd-row {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 300;
+    align-items: center;
+  }
+  .cd-text {
+    font-size: 10;
+    color: rgba(180, 180, 180, 0.7);
+  }
+  .cd-text-gold {
+    font-size: 10;
+    color: rgba(255, 200, 80, 0.8);
+  }
+  .divider {
+    height: 1;
+    width: 300;
+    background-color: rgba(255, 170, 50, 0.2);
+  }
+  .stamina-outer {
+    width: 300;
+    height: 10;
+    background-color: rgba(50, 50, 50, 0.8);
+    border-radius: 4;
+  }
+  .stamina-inner {
+    width: 280;
+    height: 10;
+    background-color: #44cc44;
+    border-radius: 4;
+  }
+  .stamina-label {
+    font-size: 10;
+    color: rgba(180, 220, 180, 0.8);
+  }
+  .tourney-info {
+    font-size: 12;
+    color: #ffaa88;
+  }
+  .danger-text {
+    font-size: 14;
+    color: #ff4444;
+    align-items: center;
+  }
+</style>
+<Panel class="root">
+  <div class="countdown" id="countdown"></div>
+  <div class="tachiai-text" id="tachiai-text"></div>
+  <div class="combo-text" id="combo-text"></div>
+  <div class="slowmo-text" id="slowmo-text"></div>
+  <div class="row">
+    <div class="score" id="score">Score: 0</div>
+    <div class="time" id="time">Time: 60s</div>
+  </div>
+  <div class="row">
+    <div class="rank" id="rank">Rank: Jonokuchi</div>
+    <div class="info" id="match-num">Match 1</div>
+  </div>
+  <div class="row">
+    <div class="opponent" id="opponent-name">VS TARO</div>
+    <div class="streak" id="streak"></div>
+  </div>
+  <div class="tourney-info" id="tourney-info"></div>
+  <div class="danger-text" id="danger-text"></div>
+  <div class="divider"></div>
+  <div class="row">
+    <div class="stamina-label" id="stamina-label">Stamina: 100%</div>
+  </div>
+  <div class="stamina-outer">
+    <div class="stamina-inner" id="stamina-bar"></div>
+  </div>
+  <div class="cd-row">
+    <div class="cd-text" id="push-cd">Push: READY</div>
+    <div class="cd-text" id="grab-cd">Grab: READY</div>
+    <div class="cd-text" id="henka-cd">Henka: READY</div>
+  </div>
+  <div class="cd-row">
+    <div class="cd-text" id="dodge-cd">Dodge: READY</div>
+    <div class="cd-text" id="charge-cd">Charge: READY</div>
+    <div class="cd-text-gold" id="harite-cd"></div>
+  </div>
+  <div class="cd-row">
+    <div class="cd-text"></div>
+    <div class="pause-btn" id="btn-pause">
+      <div class="pause-text">PAUSE</div>
+    </div>
+  </div>
+</Panel>

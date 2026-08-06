@@ -1,0 +1,107 @@
+<style>
+  .root {
+    flex-direction: column;
+    align-items: center;
+    padding: 24;
+    gap: 8;
+    background-color: rgba(10, 0, 0, 0.94);
+    border-radius: 16;
+    border-width: 2;
+    border-color: rgba(255, 170, 50, 0.6);
+    width: 380;
+  }
+  .title {
+    font-size: 24;
+    color: #ffcc44;
+  }
+  .stat {
+    font-size: 14;
+    color: rgba(220, 200, 160, 0.9);
+    width: 320;
+  }
+  .stat-highlight {
+    font-size: 14;
+    color: rgba(200, 160, 255, 0.9);
+    width: 320;
+  }
+  .divider {
+    height: 1;
+    width: 320;
+    background-color: rgba(255, 170, 50, 0.3);
+  }
+  .btn {
+    padding: 10;
+    background-color: rgba(200, 120, 30, 0.25);
+    border-radius: 8;
+    width: 180;
+    align-items: center;
+    cursor: pointer;
+    border-width: 1;
+    border-color: rgba(255, 170, 50, 0.4);
+  }
+  .btn-text {
+    font-size: 14;
+    color: #ffdd88;
+  }
+  .reset-btn {
+    padding: 8;
+    background-color: rgba(200, 40, 40, 0.25);
+    border-radius: 6;
+    width: 140;
+    align-items: center;
+    cursor: pointer;
+    border-width: 1;
+    border-color: rgba(255, 80, 80, 0.4);
+  }
+  .reset-text {
+    font-size: 12;
+    color: #ff8888;
+  }
+  .row {
+    flex-direction: row;
+    gap: 16;
+  }
+  .section-title {
+    font-size: 16;
+    color: #ffaa44;
+    width: 320;
+  }
+  .history-entry {
+    font-size: 12;
+    color: rgba(180, 170, 140, 0.8);
+    width: 320;
+  }
+</style>
+<Panel class="root">
+  <div class="title">CAREER STATS</div>
+  <div class="stat" id="stat-rank">Current Rank: Jonokuchi</div>
+  <div class="stat" id="stat-wins">Wins: 0</div>
+  <div class="stat" id="stat-losses">Losses: 0</div>
+  <div class="stat" id="stat-ratio">Win Rate: 0%</div>
+  <div class="divider"></div>
+  <div class="stat" id="stat-score">Total Score: 0</div>
+  <div class="stat" id="stat-streak">Best Streak: 0</div>
+  <div class="stat-highlight" id="stat-survival">Survival Best: Wave 0</div>
+  <div class="divider"></div>
+  <div class="stat" id="stat-pushes">Total Pushes: 0</div>
+  <div class="stat" id="stat-grabs">Total Grabs: 0</div>
+  <div class="stat" id="stat-dodges">Total Dodges: 0</div>
+  <div class="stat" id="stat-henkas">Total Henkas: 0</div>
+  <div class="stat" id="stat-ringouts">Ring Outs: 0</div>
+  <div class="divider"></div>
+  <div class="section-title">Recent Matches</div>
+  <div class="history-entry" id="history-0"></div>
+  <div class="history-entry" id="history-1"></div>
+  <div class="history-entry" id="history-2"></div>
+  <div class="history-entry" id="history-3"></div>
+  <div class="history-entry" id="history-4"></div>
+  <div class="divider"></div>
+  <div class="row">
+    <div class="btn" id="btn-back">
+      <div class="btn-text">BACK</div>
+    </div>
+    <div class="reset-btn" id="btn-reset">
+      <div class="reset-text">RESET</div>
+    </div>
+  </div>
+</Panel>
