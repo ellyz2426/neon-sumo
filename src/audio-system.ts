@@ -29,34 +29,37 @@ export class AudioSystem extends createSystem({}) {
 
   private resume() { if (this.ctx?.state === 'suspended') this.ctx.resume().catch(() => {}); }
 
-  playSFX(type: string) {
+  playSFX(type: string, weight = 1.0) {
     if (!this.ctx || !this.master) return;
     this.resume();
     const c = this.ctx;
     const now = c.currentTime;
     const g = c.createGain();
     g.connect(this.master);
+    // Weight affects pitch: heavier = deeper, lighter = sharper
+    const pitchMod = 1.0 / Math.max(0.5, weight * 0.8);
+    const volMod = 0.7 + Math.min(weight, 2.0) * 0.15;
 
     if (type === 'push') {
       const o = c.createOscillator(); o.type = 'sawtooth';
-      o.frequency.setValueAtTime(120, now); o.frequency.exponentialRampToValueAtTime(40, now + 0.15);
-      g.gain.setValueAtTime(0.5, now); g.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+      o.frequency.setValueAtTime(120 * pitchMod, now); o.frequency.exponentialRampToValueAtTime(40 * pitchMod, now + 0.15);
+      g.gain.setValueAtTime(0.5 * volMod, now); g.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
       o.connect(g); o.start(now); o.stop(now + 0.2);
       const bs = Math.floor(c.sampleRate * 0.1);
       const buf = c.createBuffer(1, bs, c.sampleRate);
       const bd = buf.getChannelData(0);
       for (let i = 0; i < bs; i++) bd[i] = (Math.random() * 2 - 1) * (1 - i / bs);
       const n = c.createBufferSource(); n.buffer = buf;
-      const ng = c.createGain(); ng.gain.setValueAtTime(0.3, now); ng.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+      const ng = c.createGain(); ng.gain.setValueAtTime(0.3 * volMod, now); ng.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
       n.connect(ng); ng.connect(this.master); n.start(now); n.stop(now + 0.1);
     } else if (type === 'grab') {
       const o = c.createOscillator(); o.type = 'square';
-      o.frequency.setValueAtTime(200, now); o.frequency.exponentialRampToValueAtTime(100, now + 0.3);
-      g.gain.setValueAtTime(0.3, now); g.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+      o.frequency.setValueAtTime(200 * pitchMod, now); o.frequency.exponentialRampToValueAtTime(100 * pitchMod, now + 0.3);
+      g.gain.setValueAtTime(0.3 * volMod, now); g.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
       o.connect(g); o.start(now); o.stop(now + 0.35);
       const o2 = c.createOscillator(); o2.type = 'triangle';
-      o2.frequency.setValueAtTime(300, now + 0.05); o2.frequency.exponentialRampToValueAtTime(150, now + 0.25);
-      const g2 = c.createGain(); g2.gain.setValueAtTime(0.2, now + 0.05); g2.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+      o2.frequency.setValueAtTime(300 * pitchMod, now + 0.05); o2.frequency.exponentialRampToValueAtTime(150 * pitchMod, now + 0.25);
+      const g2 = c.createGain(); g2.gain.setValueAtTime(0.2 * volMod, now + 0.05); g2.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
       o2.connect(g2); g2.connect(this.master); o2.start(now + 0.05); o2.stop(now + 0.3);
     } else if (type === 'dodge') {
       const o = c.createOscillator(); o.type = 'sine';

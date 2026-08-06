@@ -153,6 +153,9 @@ export interface GameData {
   edgeDanger: number;
   yokozunaEntrance: boolean;
   yokozunaEntranceTimer: number;
+  rivalryRecord: Record<string, { wins: number; losses: number }>;
+  replayActive: boolean;
+  replayTimer: number;
 }
 
 const COLOR_SCHEMES = [
@@ -226,7 +229,7 @@ export class SumoSystem extends createSystem({}) {
   private dustParticles: Mesh[] = [];
   private fallGroup: Group | null = null;
   private fallAnim = 0;
-  audioSystemRef: { playSFX: (t: string) => void } | null = null;
+  audioSystemRef: { playSFX: (t: string, weight?: number) => void } | null = null;
   private groundMesh!: Mesh;
   private platformMesh!: Mesh;
   private ringSurface!: Mesh;
@@ -261,6 +264,13 @@ export class SumoSystem extends createSystem({}) {
   private yokozunaParticles: Particle[] = [];
   private yokozunaRopeLeft!: Group;
   private yokozunaRopeRight!: Group;
+  private atmosphereParticles: Particle[] = [];
+  private atmosphereTimer = 0;
+  private lightningFlash = 0;
+  private neonBeamAngle = 0;
+  private neonBeams: Mesh[] = [];
+  private replayCamTarget = new Vector3();
+  private replayCamPos = new Vector3();
 
   init() {
     this.gameData = {
@@ -282,11 +292,13 @@ export class SumoSystem extends createSystem({}) {
       playerBeltColor: 0, matchPushes: 0, matchGrabs: 0, matchDodges: 0,
       matchHenkas: 0, matchCharges: 0, matchMaxCombo: 0, edgeDanger: 0,
       yokozunaEntrance: false, yokozunaEntranceTimer: 0,
+      rivalryRecord: {}, replayActive: false, replayTimer: 0,
     };
     this.loadStats();
     this.buildArena();
     this.buildGyoji();
     this.buildChargeMeter();
+    this.buildAtmosphereEffects();
     this.buildYokozunaRope();
     this.playerW = this.createWrestler(true, 0x00aaff, 1.0, 1.0);
     this.opponentW = this.createWrestler(false, 0xff4422, 1.0, 1.0);
@@ -307,6 +319,7 @@ export class SumoSystem extends createSystem({}) {
         this.gameData.totalRingOuts = s.totalRingOuts ?? 0;
         this.gameData.totalHenkas = s.totalHenkas ?? 0;
         this.gameData.bestWinStreak = s.bestWinStreak ?? 0;
+        this.gameData.rivalryRecord = s.rivalryRecord ?? {};
       }
     } catch { /* ignore */ }
   }
@@ -319,6 +332,7 @@ export class SumoSystem extends createSystem({}) {
         totalDodges: this.gameData.totalDodges, totalGrabs: this.gameData.totalGrabs,
         totalRingOuts: this.gameData.totalRingOuts, totalHenkas: this.gameData.totalHenkas,
         bestWinStreak: this.gameData.bestWinStreak,
+        rivalryRecord: this.gameData.rivalryRecord,
       }));
     } catch { /* ignore */ }
   }
@@ -591,6 +605,169 @@ export class SumoSystem extends createSystem({}) {
     this.yokozunaRopeRight.position.set(0.6, 0.6, 0);
     this.yokozunaRopeRight.scale.x = -1;
     this.playerW.group.add(this.yokozunaRopeRight);
+  }
+
+  private buildAtmosphereEffects() {
+    // Neon Arena: 4 rotating beam spotlights
+    for (let i = 0; i < 4; i++) {
+      const beam = new Mesh(
+        new CylinderGeometry(0.02, 0.15, 6, 6),
+        new MeshStandardMaterial({
+          color: 0x00ccff, emissive: 0x00aaff, emissiveIntensity: 0.8,
+          transparent: true, opacity: 0,
+        })
+      );
+      beam.position.set(0, 5.0, 0);
+      beam.rotation.z = Math.PI / 6;
+      beam.rotation.y = (i / 4) * Math.PI * 2;
+      this.scene.add(beam);
+      this.neonBeams.push(beam);
+    }
+  }
+
+  private updateAtmosphere(dt: number, time: number) {
+    const scheme = this.gameData.colorScheme;
+    this.atmosphereTimer += dt;
+
+    // Cherry Blossom (scheme 2): floating petal particles
+    if (scheme === 2) {
+      if (this.atmosphereTimer > 0.15) {
+        this.atmosphereTimer = 0;
+        const petalColors = [0xff99bb, 0xffaacc, 0xffbbdd, 0xffccee, 0xff88aa];
+        const c = petalColors[Math.floor(Math.random() * petalColors.length)];
+        const m = new Mesh(
+          new PlaneGeometry(0.06, 0.04),
+          new MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.3, transparent: true, opacity: 0.85, side: 2 })
+        );
+        const angle = Math.random() * Math.PI * 2;
+        const r = 2 + Math.random() * 8;
+        m.position.set(Math.cos(angle) * r, 4 + Math.random() * 2, Math.sin(angle) * r);
+        m.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        this.scene.add(m);
+        this.atmosphereParticles.push({
+          mesh: m,
+          vel: new Vector3((Math.random() - 0.5) * 0.8, -0.4 - Math.random() * 0.3, (Math.random() - 0.5) * 0.8),
+          life: 5 + Math.random() * 3,
+          maxLife: 8,
+        });
+      }
+    }
+
+    // Thunder (scheme 3): periodic lightning flashes
+    if (scheme === 3) {
+      if (this.lightningFlash > 0) {
+        this.lightningFlash -= dt * 4;
+        this.ambientLight.intensity = 0.6 + this.lightningFlash * 2.5;
+        if (this.lightningFlash <= 0) {
+          this.lightningFlash = 0;
+          this.ambientLight.intensity = 0.6;
+        }
+      } else if (Math.random() < dt * 0.12) {
+        // Random lightning strike
+        this.lightningFlash = 1.0;
+        this.ambientLight.color.set(0xffffff);
+        // Spawn a brief lightning bolt line
+        const boltX = (Math.random() - 0.5) * 16;
+        const boltZ = (Math.random() - 0.5) * 16;
+        const bolt = new Mesh(
+          new BoxGeometry(0.04, 5.5, 0.04),
+          new MeshStandardMaterial({ color: 0xffffcc, emissive: 0xffffaa, emissiveIntensity: 3, transparent: true, opacity: 1 })
+        );
+        bolt.position.set(boltX, 3, boltZ);
+        bolt.rotation.z = (Math.random() - 0.5) * 0.3;
+        this.scene.add(bolt);
+        this.atmosphereParticles.push({
+          mesh: bolt, vel: new Vector3(), life: 0.15 + Math.random() * 0.1, maxLife: 0.25,
+        });
+        // Fork
+        if (Math.random() > 0.4) {
+          const fork = new Mesh(
+            new BoxGeometry(0.03, 2.5, 0.03),
+            new MeshStandardMaterial({ color: 0xffffdd, emissive: 0xffffaa, emissiveIntensity: 2.5, transparent: true, opacity: 0.9 })
+          );
+          fork.position.set(boltX + (Math.random() - 0.5) * 1.5, 2, boltZ + (Math.random() - 0.5) * 1.5);
+          fork.rotation.z = (Math.random() - 0.5) * 0.6;
+          fork.rotation.x = (Math.random() - 0.5) * 0.3;
+          this.scene.add(fork);
+          this.atmosphereParticles.push({
+            mesh: fork, vel: new Vector3(), life: 0.12, maxLife: 0.2,
+          });
+        }
+      }
+      // Restore ambient color after flash
+      if (this.lightningFlash <= 0) {
+        const cs = COLOR_SCHEMES[scheme];
+        this.ambientLight.color.set(cs.ambient);
+      }
+    }
+
+    // Neon Arena (scheme 1): rotating beam spotlights
+    if (scheme === 1) {
+      this.neonBeamAngle += dt * 0.8;
+      for (let i = 0; i < this.neonBeams.length; i++) {
+        this.neonBeams[i].rotation.y = this.neonBeamAngle + (i / 4) * Math.PI * 2;
+        (this.neonBeams[i].material as MeshStandardMaterial).opacity = 0.15 + Math.sin(time * 2 + i) * 0.06;
+      }
+    } else {
+      // Hide beams for other themes
+      for (const b of this.neonBeams) {
+        (b.material as MeshStandardMaterial).opacity = 0;
+      }
+    }
+
+    // Dohyo Classic (scheme 0): subtle incense smoke wisps
+    if (scheme === 0) {
+      if (this.atmosphereTimer > 0.5) {
+        this.atmosphereTimer = 0;
+        const smokeM = new Mesh(
+          new SphereGeometry(0.08, 4, 3),
+          new MeshStandardMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.15, depthWrite: false })
+        );
+        // Emit from lantern positions
+        const lIdx = Math.floor(Math.random() * 4);
+        const la = (lIdx / 4) * Math.PI * 2 + Math.PI / 4;
+        const lr = RING_RADIUS + 1.5;
+        smokeM.position.set(Math.cos(la) * lr, 2.8, Math.sin(la) * lr);
+        this.scene.add(smokeM);
+        this.atmosphereParticles.push({
+          mesh: smokeM,
+          vel: new Vector3((Math.random() - 0.5) * 0.2, 0.15 + Math.random() * 0.1, (Math.random() - 0.5) * 0.2),
+          life: 3 + Math.random() * 2, maxLife: 5,
+        });
+      }
+    }
+
+    // Update atmosphere particles
+    for (let i = this.atmosphereParticles.length - 1; i >= 0; i--) {
+      const p = this.atmosphereParticles[i];
+      p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
+      // Petals: gentle swaying
+      if (scheme === 2) {
+        p.mesh.rotation.x += dt * 1.5;
+        p.mesh.rotation.z += dt * 0.8;
+        p.vel.x += Math.sin(time * 2 + i * 0.5) * dt * 0.3;
+      }
+      // Smoke: expand slowly
+      if (scheme === 0) {
+        p.mesh.scale.addScalar(dt * 0.15);
+      }
+      p.life -= dt;
+      const t = Math.max(0, p.life / p.maxLife);
+      (p.mesh.material as MeshStandardMaterial).opacity *= (t < 0.3 ? t / 0.3 : 1);
+      if (p.life <= 0) {
+        this.scene.remove(p.mesh);
+        p.mesh.geometry.dispose();
+        (p.mesh.material as MeshStandardMaterial).dispose();
+        this.atmosphereParticles.splice(i, 1);
+      }
+    }
+    // Cap atmosphere particles
+    while (this.atmosphereParticles.length > 60) {
+      const old = this.atmosphereParticles.shift()!;
+      this.scene.remove(old.mesh);
+      old.mesh.geometry.dispose();
+      (old.mesh.material as MeshStandardMaterial).dispose();
+    }
   }
 
   private spawnSandSpray(pos: Vector3, intensity: number) {
@@ -1137,6 +1314,8 @@ export class SumoSystem extends createSystem({}) {
     this.updateZabuton(delta);
     this.updateChargeMeter(dt);
     this.updateRankUpEffect(delta);
+    this.updateAtmosphere(dt, time);
+    this.updateReplayCamera(delta);
   }
 
   private updateChargeMeter(dt: number) {
@@ -1332,7 +1511,12 @@ export class SumoSystem extends createSystem({}) {
     p.damageFlash = Math.max(0, p.damageFlash - dt * 3);
   }
 
-  private sfx(t: string) { if (this.gameData.sfxOn && this.audioSystemRef) this.audioSystemRef.playSFX(t); }
+  private sfx(t: string) {
+    if (this.gameData.sfxOn && this.audioSystemRef) {
+      const w = this.opponentW.weightVal ?? 1.0;
+      this.audioSystemRef.playSFX(t, w);
+    }
+  }
 
   private doHenka(a: Wrestler, t: Wrestler, moveX: number) {
     const dist = a.pos.distanceTo(t.pos);
@@ -1600,6 +1784,10 @@ export class SumoSystem extends createSystem({}) {
     this.shakeDecay = 5;
     this.sfx('ringout');
     this.triggerSlowMo();
+    // Start replay camera
+    this.gameData.replayActive = true;
+    this.gameData.replayTimer = 2.0;
+    this.replayCamTarget.copy(w.pos).setY(0.8);
     // Big crowd reaction on ring-out
     for (let i = 0; i < this.spectatorHeads.length; i++) {
       this.spectatorBounce[i] = 1.5 + Math.random() * 0.5;
@@ -1686,13 +1874,23 @@ export class SumoSystem extends createSystem({}) {
       }
     }
     // Track match history
+    const oppName = this.gameData.currentOpponent?.name ?? 'UNKNOWN';
     this.gameData.matchHistory.unshift({
-      opponent: this.gameData.currentOpponent?.name ?? 'UNKNOWN',
+      opponent: oppName,
       result: this.gameData.matchResult ?? 'loss',
       technique: this.gameData.winTechnique,
       score: this.gameData.score,
     });
     if (this.gameData.matchHistory.length > 10) this.gameData.matchHistory.pop();
+    // Update rivalry records
+    if (!this.gameData.rivalryRecord[oppName]) {
+      this.gameData.rivalryRecord[oppName] = { wins: 0, losses: 0 };
+    }
+    if (this.gameData.matchResult === 'win') {
+      this.gameData.rivalryRecord[oppName].wins++;
+    } else {
+      this.gameData.rivalryRecord[oppName].losses++;
+    }
     this.saveStats();
     this.gameData.state = 'results';
   }
@@ -1873,6 +2071,8 @@ export class SumoSystem extends createSystem({}) {
   }
 
   private updateCam(dt: number) {
+    // Don't update normal camera during replay
+    if (this.gameData.replayActive) return;
     const c = this.camera;
     const dist = this.playerW.pos.distanceTo(this.opponentW.pos);
     const targetY = dist < 1.5 ? 4.5 : 6;
@@ -1885,6 +2085,28 @@ export class SumoSystem extends createSystem({}) {
       if (this.shakeIntensity < 0.001) this.shakeIntensity = 0;
     }
     c.lookAt(0, 0.5, 0);
+  }
+
+  private updateReplayCamera(dt: number) {
+    if (!this.gameData.replayActive) return;
+    this.gameData.replayTimer -= dt;
+    if (this.gameData.replayTimer <= 0) {
+      this.gameData.replayActive = false;
+      return;
+    }
+    // Sweep camera around the winner for dramatic effect
+    const t = 1 - this.gameData.replayTimer / 2.0;
+    const angle = t * Math.PI * 0.8;
+    const winner = this.gameData.matchResult === 'win' ? this.playerW : this.opponentW;
+    const radius = 3 + t * 1.5;
+    this.replayCamPos.set(
+      winner.pos.x + Math.cos(angle) * radius,
+      1.5 + t * 1.5,
+      winner.pos.z + Math.sin(angle) * radius
+    );
+    this.replayCamTarget.lerp(winner.pos.clone().setY(0.8), dt * 3);
+    this.camera.position.lerp(this.replayCamPos, dt * 4);
+    this.camera.lookAt(this.replayCamTarget);
   }
 
   private spawnYokozunaParticles() {
@@ -1981,6 +2203,9 @@ export class SumoSystem extends createSystem({}) {
     if (opp.technique >= 0.7) warnings.push('Technical — expect henka and grabs!');
     if (opp.aggression >= 0.8) warnings.push('Aggressive — relentless attacker!');
     return warnings.join(' ');
+  }
+  getRivalryRecord(name: string): { wins: number; losses: number } {
+    return this.gameData.rivalryRecord[name] ?? { wins: 0, losses: 0 };
   }
   continueAfterSurvivalWin() {
     if (this.gameData.inSurvival && this.gameData.matchResult === 'win') {

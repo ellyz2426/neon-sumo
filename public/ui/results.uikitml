@@ -26,6 +26,10 @@
     font-size: 17;
     color: #ff8844;
   }
+  .rivalry {
+    font-size: 13;
+    color: rgba(255, 180, 80, 0.8);
+  }
   .combo {
     font-size: 16;
     color: #ff44ff;
@@ -97,6 +101,7 @@
   <div class="tourney-result" id="tourney-result"></div>
   <div class="champion" id="champion-text"></div>
   <div class="highlight" id="result-opponent">Opponent: TARO</div>
+  <div class="rivalry" id="result-rivalry"></div>
   <div class="stat" id="result-score">Score: 0</div>
   <div class="stat" id="result-rank">Rank: Jonokuchi</div>
   <div class="stat" id="result-record">Record: 0W - 0L</div>

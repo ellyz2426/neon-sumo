@@ -174,6 +174,12 @@ export class UISystem extends createSystem({}) {
 
     s.getElementById('scout-warning')?.setProperties({ text: this.sumo.getScoutWarning() });
     s.getElementById('scout-record')?.setProperties({ text: `Your Record: ${d.wins}W - ${d.losses}L` });
+    // Rivalry record vs this specific opponent
+    const rival = this.sumo.getRivalryRecord(opp.name);
+    const rivalText = rival.wins + rival.losses > 0
+      ? `vs ${opp.name}: ${rival.wins}W - ${rival.losses}L`
+      : `First fight vs ${opp.name}!`;
+    s.getElementById('scout-rivalry')?.setProperties({ text: rivalText });
   }
 
   private updateHUD(d: ReturnType<SumoSystem['getGameData']>) {
@@ -276,6 +282,11 @@ export class UISystem extends createSystem({}) {
     r.getElementById('result-record')?.setProperties({ text: `Record: ${d.wins}W - ${d.losses}L` });
     r.getElementById('result-streak')?.setProperties({ text: `Win Streak: ${d.currentStreak}` });
     r.getElementById('result-opponent')?.setProperties({ text: `Opponent: ${this.sumo.getOpponentName()}` });
+    // Show rivalry record on results
+    const riv = this.sumo.getRivalryRecord(this.sumo.getOpponentName());
+    r.getElementById('result-rivalry')?.setProperties({
+      text: `vs ${this.sumo.getOpponentName()}: ${riv.wins}W - ${riv.losses}L`
+    });
     const comboBonus = d.comboCount >= 2 ? `Combo Bonus: +${d.comboCount * 100}` : '';
     r.getElementById('result-combo')?.setProperties({ text: comboBonus });
     r.getElementById('upset-text')?.setProperties({ text: this.sumo.isUpsetWin() ? '座布団 ZABUTON THROW!' : '' });
